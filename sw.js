@@ -1,22 +1,37 @@
-const CACHE_NAME = 'fisc-ce388-v1';
-const urlsToCache = [
+const CACHE_NAME = 'cdois-vias-v1';
+const ASSETS_TO_CACHE = [
   './index.html',
-  './manifest.json'
+  './Diagrama.js',
+  './OACs.js',
+  './base_diagrama.pdf',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'
 ];
 
-self.addEventListener('install', event => {
+// Instalação e Cache inicial
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS_TO_CACHE);
+    })
   );
 });
 
-self.addEventListener('fetch', event => {
+// Ativação e limpeza de cache antigo
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    })
+  );
+});
+
+// Intercepta requisições para servir o conteúdo em cache
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Retorna do cache se encontrar, senão busca na rede
-        return response || fetch(event.request);
-      })
+    caches.match(event.request).then((cachedResponse) => {
+      return cachedResponse || fetch(event.request);
+    })
   );
 });
