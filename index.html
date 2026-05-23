@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CDois Vias - App de Fiscalização</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --primary: #2c3e50;
+            --secondary: #27ae60;
+            --tertiary: #f39c12;
+            --danger: #e74c3c;
+            --light: #ecf0f1;
+            --text-dark: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); padding-bottom: 80px; }
+        header { background-color: var(--primary); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        h1 { font-size: 1.2rem; }
+        
+        /* Container da Planta Iluminada */
+        .planta-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+        
+        /* Estilização da Estaca */
+        .estaca-row { display: flex; align-items: center; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .estaca-label { width: 60px; background: var(--primary); color: white; text-align: center; padding: 15px 5px; font-weight: bold; font-size: 0.9rem; }
+        .faixas-container { display: flex; flex: 1; height: 100%; cursor: pointer; }
+        .faixa { flex: 1; padding: 15px 5px; text-align: center; border-right: 1px solid #eee; font-size: 0.8rem; font-weight: bold; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .faixa:last-child { border-right: none; }
+        
+        /* Cores de Status */
+        .status-limpeza { background-color: #bdc3c7; color: var(--text-dark); text-shadow: none; }
+        .status-terraplenagem { background-color: var(--tertiary); }
+        .status-pavimentado { background-color: var(--secondary); }
+        
+        /* OAC Marker */
+        .oac-marker { background-color: #3498db; color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; margin: 5px 10px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: inline-block; }
+        .oac-projetado { background-color: #3498db; }
+        .oac-execucao { background-color: var(--tertiary); }
+        .oac-concluido { background-color: var(--secondary); }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 200; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; }
+        .modal-title { font-size: 1.2rem; margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .btn { display: block; width: 100%; padding: 15px; margin-bottom: 10px; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; color: white; cursor: pointer; }
+        .btn-close { background-color: #95a5a6; margin-top: 20px; }
+        .btn-status-1 { background-color: #bdc3c7; color: var(--text-dark); }
+        .btn-status-2 { background-color: var(--tertiary); }
+        .btn-status-3 { background-color: var(--secondary); }
+        
+        textarea { width: 100%; height: 80px; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-family: inherit; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>CDois Vias: Fisc CE-388</h1>
+        <p style="font-size: 0.8rem; margin-top: 5px;" id="sync-status">Sincronizado (Offline-First)</p>
+    </header>
+
+    <div class="planta-container" id="planta-container">
+        </div>
+
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="modalTitle">Estaca X</h2>
+            
+            <p style="margin-bottom: 10px; font-weight: bold;">Atualizar Status:</p>
+            <button class="btn btn-status-1" onclick="updateStatus('limpeza')">Falta Terraplenagem</button>
+            <button class="btn btn-status-2" onclick="updateStatus('terraplenagem')">Terraplenagem Concluída</button>
+            <button class="btn btn-status-3" onclick="updateStatus('pavimentado')">Pavimentação Concluída</button>
+            
+            <p style="margin-bottom: 5px; margin-top: 15px; font-weight: bold;">Ocorrências / Observações:</p>
+            <textarea id="obsText" placeholder="Ex: Bueiro necessita de substituição total por avarias estruturais..."></textarea>
+            
+            <button class="btn btn-close" onclick="closeModal()">Salvar e Fechar</button>
+        </div>
+    </div>
+
+    <script>
+        // Dados Iniciais e Estrutura (Simulando o trecho)
+        const totalEstacas = 50; // Para MVP, mostrando 50 estacas de 10 em 10, ou você pode gerar as 648
+        let db = JSON.parse(localStorage.getItem('ce388_db')) || inicializarDB();
+
+        // OACs mapeadas do seu PDF
+        const oacs = {
+            18: { tipo: 'BSTC - 0,80m (Ampliação)', status: 'projetado' },
+            30: { tipo: 'BSTC - 0,80m (Ampliação)', status: 'projetado' },
+            135: { tipo: 'BDCC - 2,0x2,0m (Ampliação)', status: 'execucao' },
+            387: { tipo: 'BSTC - 1,00m (Ampliação)', status: 'concluido' }
+        };
+
+        let currentEstacaIndex = null;
+        let currentTargetSide = null;
+
+        function inicializarDB() {
+            let initialData = [];
+            for(let i = 0; i <= 400; i+=10) { // Gerando de 10 em 10 para o MVP
+                initialData.push({
+                    estaca: i,
+                    statusLadoEsq: 'limpeza', // limpeza, terraplenagem, pavimentado
+                    statusLadoDir: 'limpeza',
+                    obs: ''
+                });
+            }
+            return initialData;
+        }
+
+        function salvarDB() {
+            localStorage.setItem('ce388_db', JSON.stringify(db));
+            renderizarPlanta();
+        }
+
+        function renderizarPlanta() {
+            const container = document.getElementById('planta-container');
+            container.innerHTML = '';
+
+            db.forEach((item, index) => {
+                const estacaRow = document.createElement('div');
+                
+                // Verifica se tem OAC nesta estaca (usando a aproximação para o múltiplo de 10 no MVP)
+                let oacHtml = '';
+                let estacaAproximada = Object.keys(oacs).find(key => key >= item.estaca && key < item.estaca + 10);
+                if(estacaAproximada) {
+                    const oac = oacs[estacaAproximada];
+                    const corClasse = oac.status === 'projetado' ? 'oac-projetado' : (oac.status === 'execucao' ? 'oac-execucao' : 'oac-concluido');
+                    oacHtml = `<div class="oac-marker ${corClasse}">${oac.tipo} (Est. ${estacaAproximada})</div>`;
+                }
+
+                estacaRow.innerHTML = `
+                    <div style="width: 100%;">
+                        <div class="estaca-row">
+                            <div class="estaca-label">${item.estaca}</div>
+                            <div class="faixas-container">
+                                <div class="faixa status-${item.statusLadoEsq}" onclick="openModal(${index}, 'esq')">Lado Esq</div>
+                                <div class="faixa status-${item.statusLadoDir}" onclick="openModal(${index}, 'dir')">Lado Dir</div>
+                            </div>
+                        </div>
+                        ${oacHtml}
+                    </div>
+                `;
+                container.appendChild(estacaRow);
+            });
+        }
+
+        function openModal(index, side) {
+            currentEstacaIndex = index;
+            currentTargetSide = side;
+            const item = db[index];
+            
+            document.getElementById('modalTitle').innerText = `Estaca ${item.estaca} - Lado ${side === 'esq' ? 'Esquerdo' : 'Direito'}`;
+            document.getElementById('obsText').value = item.obs || '';
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            const obs = document.getElementById('obsText').value;
+            db[currentEstacaIndex].obs = obs;
+            salvarDB();
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        function updateStatus(novoStatus) {
+            if(currentTargetSide === 'esq') {
+                db[currentEstacaIndex].statusLadoEsq = novoStatus;
+            } else {
+                db[currentEstacaIndex].statusLadoDir = novoStatus;
+            }
+            salvarDB(); // Salva no LocalStorage imediatamente
+            closeModal();
+        }
+
+        // Registra o Service Worker para o PWA (Offline)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+            .then(() => console.log('Service Worker Registrado'))
+            .catch(err => console.error('Erro no Service Worker', err));
+        }
+
+        // Renderiza a primeira vez
+        renderizarPlanta();
+    </script>
+</body>
+</html>
