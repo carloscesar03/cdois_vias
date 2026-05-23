@@ -26,7 +26,6 @@
         .hidden { display: none !important; }
         .btn { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; text-align: center; font-size: 1rem; touch-action: manipulation; }
         .btn-success { background: var(--secondary); }
-        .btn-danger { background: var(--danger); }
         .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 600; }
@@ -185,7 +184,6 @@
                 <span class="nav-icon">🕳️</span><span>OACs</span>
             </button>
         </nav>
-
     </div>
 
     <div class="modal" id="modal-oac">
@@ -240,7 +238,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // Substitua aqui novamente as SUAS chaves do Firebase se necessário
         const firebaseConfig = {
             apiKey: "AIzaSyC2CyPHNziQlavyCzttDY3D96TmhkYHoaQ",
             authDomain: "cdois-vias.firebaseapp.com",
@@ -261,7 +258,6 @@
         window.registrosDiagrama = [];
         window.registrosOAC = [];
 
-        // --- SISTEMA DE LOGIN E LOGOUT ---
         window.realizarLogin = function() {
             const user = document.getElementById('login-user').value.trim().toLowerCase();
             const pass = document.getElementById('login-pass').value;
@@ -278,7 +274,6 @@
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-structure').classList.remove('hidden');
             document.getElementById('user-display').innerText = window.usuarioLogado.nome;
-            
             iniciarOuvintesNuvem();
         }
 
@@ -308,12 +303,8 @@
             onSnapshot(oacRef, (snapshot) => {
                 window.registrosOAC = [];
                 snapshot.forEach((doc) => window.registrosOAC.push({ id: doc.id, ...doc.data() }));
-                
-                if (window.registrosOAC.length === 0) {
-                    popularBancoOACInicial();
-                } else {
-                    atualizarDashboardOAC();
-                }
+                if (window.registrosOAC.length === 0) popularBancoOACInicial();
+                else atualizarDashboardOAC();
             });
         }
 
@@ -324,9 +315,7 @@
                 { estaca: '135+15,00', tipo: 'BDCC - 2,0x2,0m', categoria: 'Ampliação', status: 'andamento', extensao: '5.00', bocas: 1, redentes: '0.50', recravas: '', obs: 'Iniciado LD', concluido: false },
                 { estaca: '248+19,40', tipo: 'BSTC - 1,00m', categoria: 'Ampliação', status: 'pendente', extensao: '', bocas: 0, redentes: '', recravas: '', obs: '', concluido: false }
             ];
-            for (const item of dbInicialOAC) {
-                await addDoc(oacRef, item);
-            }
+            for (const item of dbInicialOAC) await addDoc(oacRef, item);
         }
 
         window.salvarDiagrama = async function() {
@@ -337,10 +326,7 @@
             const estFin = document.getElementById('diag-est-fin').value;
             const fracFin = document.getElementById('diag-frac-fin').value || "0";
 
-            if(!estIni || !estFin) {
-                alert("Preencha as estacas inicial e final.");
-                return;
-            }
+            if(!estIni || !estFin) { alert("Preencha as estacas inicial e final."); return; }
 
             const novoRegistro = {
                 dataHora: new Date().toLocaleString('pt-BR'),
@@ -362,11 +348,7 @@
             const container = document.getElementById('recent-logs');
             container.innerHTML = '';
             const recentes = window.registrosDiagrama.slice(0, 3);
-            
-            if(recentes.length === 0) {
-                container.innerHTML = '<p>Nenhum lançamento recente na nuvem.</p>';
-                return;
-            }
+            if(recentes.length === 0) { container.innerHTML = '<p>Nenhum lançamento recente na nuvem.</p>'; return; }
 
             recentes.forEach(log => {
                 container.innerHTML += `
@@ -405,7 +387,6 @@
                     </div>
                 `;
             });
-
             document.getElementById('oac-count-concluido').innerText = concluidos;
             document.getElementById('oac-count-andamento').innerText = andamento;
             document.getElementById('oac-count-pendente').innerText = pendentes;
@@ -462,15 +443,14 @@
             alert('Avanço do bueiro atualizado na nuvem!');
         }
 
-        // --- MOTOR DE GERAÇÃO PDF COM PDF-LIB ---
+        // --- MOTOR DE GERAÇÃO PDF CORRIGIDO ---
         window.gerarPlantaPDF = async function() {
             try {
-                alert('Aguarde, carregando a base da Planta Iluminada e processando os dados...');
+                alert('Aguarde, processando as cores e gerando o PDF...');
 
-                // 1. Busca o PDF em branco (Deve estar na mesma pasta como base_diagrama.pdf)
                 const urlBase = 'base_diagrama.pdf';
                 const existingPdfBytes = await fetch(urlBase).then(res => {
-                    if(!res.ok) throw new Error('Arquivo "base_diagrama.pdf" não encontrado. Verifique se ele está na pasta do projeto.');
+                    if(!res.ok) throw new Error('Arquivo "base_diagrama.pdf" não encontrado.');
                     return res.arrayBuffer();
                 });
 
@@ -478,56 +458,97 @@
                 const pdfDoc = await PDFDocument.load(existingPdfBytes);
                 const pages = pdfDoc.getPages();
                 
-                // 2. Cores padronizadas da engenharia
-                const corConcluido = rgb(0.06, 0.72, 0.50); // Verde (#10b981)
-                const corExecucao = rgb(0.99, 0.82, 0.30); // Amarelo (#fcd34d)
+                // Dicionário Oficial de Cores (RGB de 0 a 1)
+                const cores = {
+                    'Limpeza/Supressão': rgb(0.13, 0.55, 0.13), // Verde Escuro
+                    'Terraplenagem': rgb(0.93, 0.46, 0.0),      // Laranja
+                    'Regularização': rgb(0.55, 0.27, 0.07),     // Marrom
+                    'Sub Base': rgb(0.2, 0.6, 1.0),             // Azul Claro
+                    'Base': rgb(0.5, 0.0, 0.5),                 // Roxo
+                    'Imprimação': rgb(0.4, 0.4, 0.4),           // Cinza
+                    'TSD': rgb(0.1, 0.1, 0.1),                  // Preto
+                    'Em Execução': rgb(0.99, 0.82, 0.30)        // Amarelo
+                };
 
-                // 3. Processa os apontamentos do banco
-                const roadStatus = new Array(649).fill('Pendente');
+                // Desenhando a Legenda na Página 1
+                const page1 = pages[0];
+                const { height } = page1.getSize(); 
+
+                // Y=0 é no fundo. height é o topo (aprox 595 pontos).
+                let legX = 40;
+                let legY = height - 30; // 30 pontos descendo do topo
+                
+                page1.drawText('LEGENDA DE SERVIÇOS (CONCLUÍDOS):', { x: legX, y: legY + 12, size: 9, color: rgb(0,0,0) });
+                
+                const desenharLegenda = (texto, cor, posX, posY) => {
+                    page1.drawRectangle({ x: posX, y: posY, width: 10, height: 10, color: cor });
+                    page1.drawText(texto, { x: posX + 15, y: posY + 2, size: 8 });
+                };
+
+                // Plotando as cores da legenda na folha
+                desenharLegenda('Em Execução', cores['Em Execução'], legX, legY - 5);
+                desenharLegenda('Limpeza', cores['Limpeza/Supressão'], legX + 80, legY - 5);
+                desenharLegenda('Terraplenagem', cores['Terraplenagem'], legX + 140, legY - 5);
+                desenharLegenda('Regul.', cores['Regularização'], legX + 230, legY - 5);
+                desenharLegenda('Sub Base', cores['Sub Base'], legX + 280, legY - 5);
+                desenharLegenda('Base', cores['Base'], legX + 340, legY - 5);
+                desenharLegenda('Imprimação', cores['Imprimação'], legX + 390, legY - 5);
+                desenharLegenda('TSD', cores['TSD'], legX + 460, legY - 5);
+
+                // Organizando dados lançados (salva a cor mais atual daquela estaca)
+                const roadStatus = new Array(649).fill(null);
                 const registrosOrdemCronologica = [...window.registrosDiagrama].reverse();
                 
                 registrosOrdemCronologica.forEach(reg => {
                     let inicio = parseInt(reg.estIni);
                     let fim = parseInt(reg.estFin);
                     for(let i = inicio; i <= fim; i++) {
-                        if(i <= 648) roadStatus[i] = reg.status;
+                        if(i <= 648) {
+                            roadStatus[i] = { status: reg.status, servico: reg.servico };
+                        }
                     }
                 });
 
-                // 4. Lógica de "Carimbo" (Pintura das Estacas)
-                // NOTA TÉCNICA PARA AJUSTE FUTURO: 
-                // As variáveis de coordenadas (x, y) abaixo são aproximadas e deverão ser calibradas 
-                // por você de acordo com as dimensões internas das células do seu Excel original.
-                
-                const page1 = pages[0]; // A primeira página do seu PDF
-                
-                // Exemplo de calibração para a primeira linha de estacas:
-                let xInicialFaixa1 = 50; 
-                let yFaixa1 = 600; // Posição vertical da primeira pista no PDF
-                let larguraEstacaPDF = 12; // Largura do quadradinho no PDF
-                let alturaFaixaPDF = 18;   // Altura do quadradinho no PDF
-
-                // Aplica a cor em cima do PDF base
+                // Lógica de Linhas (Row) baseada nas 3 fileiras do seu Excel
                 for (let i = 0; i <= 648; i++) {
-                    if (roadStatus[i] !== 'Pendente') {
-                        let corAplicada = roadStatus[i] === 'Concluído' ? corConcluido : corExecucao;
+                    if (roadStatus[i] && roadStatus[i].status !== 'Pendente') {
+                        let corAplicada = roadStatus[i].status === 'Concluído' ? cores[roadStatus[i].servico] : cores['Em Execução'];
                         
-                        // Este If simula a pintura apenas nas primeiras 100 estacas para validação do conceito.
-                        // Posteriormente, mapearemos os limites exatos (ex: Estaca 120 cai para a linha de baixo).
-                        if(i < 100) {
-                            page1.drawRectangle({
-                                x: xInicialFaixa1 + (i * larguraEstacaPDF),
-                                y: yFaixa1,
-                                width: larguraEstacaPDF,
-                                height: alturaFaixaPDF,
-                                color: corAplicada,
-                                opacity: 0.75, // Translucidez para não apagar a linha da grade do Excel
-                            });
-                        }
+                        let pageIndex = 0;
+                        let rowIndex = 0;
+                        let posNaLinha = 0;
+
+                        // Mapeamento que reflete a exata quebra de linha do seu PDF
+                        if (i <= 120) { pageIndex = 0; rowIndex = 0; posNaLinha = i; }
+                        else if (i <= 241) { pageIndex = 0; rowIndex = 1; posNaLinha = i - 121; }
+                        else if (i <= 362) { pageIndex = 0; rowIndex = 2; posNaLinha = i - 242; }
+                        else if (i <= 483) { pageIndex = 1; rowIndex = 0; posNaLinha = i - 363; }
+                        else if (i <= 604) { pageIndex = 1; rowIndex = 1; posNaLinha = i - 484; }
+                        else { pageIndex = 1; rowIndex = 2; posNaLinha = i - 605; }
+
+                        let paginaAtual = pages[pageIndex];
+                        if (!paginaAtual) continue; 
+
+                        // Eixo Y: Primeira linha desce um pouco do topo, a segunda desce mais...
+                        let yBase;
+                        if (rowIndex === 0) yBase = height - 200; 
+                        if (rowIndex === 1) yBase = height - 370; 
+                        if (rowIndex === 2) yBase = height - 540; 
+
+                        // Eixo X: Afasta da margem esquerda e avança baseado no número da estaca
+                        let xBase = 50 + (posNaLinha * 6.5); 
+                        
+                        paginaAtual.drawRectangle({
+                            x: xBase,
+                            y: yBase,
+                            width: 6.5,
+                            height: 30, // Pinta como um "marca-texto" cobrindo a altura das faixas
+                            color: corAplicada,
+                            opacity: 0.65 // Translúcido para não tampar os textos e linhas pretas originais do seu Excel
+                        });
                     }
                 }
 
-                // 5. Salvar e disparar download para o usuário
                 const pdfBytes = await pdfDoc.save();
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
                 const link = document.createElement('a');
