@@ -62,6 +62,8 @@
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
         .modal-content { background: var(--surface); width: 100%; max-width: 500px; padding: 20px; border-radius: 12px; max-height: 90vh; overflow-y: auto; }
+        
+        .diretriz-projeto { background-color: #e0f2fe; border-left: 4px solid #0284c7; padding: 10px; border-radius: 4px; font-size: 0.85rem; color: #0369a1; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -190,11 +192,17 @@
         <div class="modal-content">
             <h3 id="modal-oac-title" style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">Editar Bueiro</h3>
             
+            <div class="diretriz-projeto">
+                <strong>Diretriz do Projeto:</strong><br>
+                <span id="modal-oac-diretriz"></span>
+            </div>
+
             <div class="input-group">
                 <label>Tipo de Projeto</label>
                 <select id="modal-oac-tipo">
                     <option value="Ampliação">Ampliação</option>
                     <option value="Projetado">Projetado (Novo)</option>
+                    <option value="Recuperação">Recuperação</option>
                 </select>
             </div>
             
@@ -218,7 +226,7 @@
             </div>
 
             <div class="input-group">
-                <label>Observações</label>
+                <label>Observações de Execução</label>
                 <textarea id="modal-oac-obs" rows="3" placeholder="Ex: Necessitou substituição total..."></textarea>
             </div>
 
@@ -309,13 +317,98 @@
         }
 
         async function popularBancoOACInicial() {
-            const dbInicialOAC = [
-                { estaca: '18+2,20', tipo: 'BSTC - 0,80m', categoria: 'Ampliação', status: 'pendente', extensao: '', bocas: 0, redentes: '', recravas: '', obs: '', concluido: false },
-                { estaca: '30+1,20', tipo: 'BSTC - 0,80m', categoria: 'Ampliação', status: 'pendente', extensao: '', bocas: 0, redentes: '', recravas: '', obs: '', concluido: false },
-                { estaca: '135+15,00', tipo: 'BDCC - 2,0x2,0m', categoria: 'Ampliação', status: 'andamento', extensao: '5.00', bocas: 1, redentes: '0.50', recravas: '', obs: 'Iniciado LD', concluido: false },
-                { estaca: '248+19,40', tipo: 'BSTC - 1,00m', categoria: 'Ampliação', status: 'pendente', extensao: '', bocas: 0, redentes: '', recravas: '', obs: '', concluido: false }
+            const listaCompleta = [
+                { estaca: '1+12,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza', categoria: 'Ampliação' },
+                { estaca: '9+2,50', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 8,0 metros para o lado direito e construir 02 bocas de lobo na montante', categoria: 'Ampliação' },
+                { estaca: '18+2,20', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 8,0 metros para o lado direito e construir galeria com 122 m de ø=0,80m, 02 bocas de lobo e 01 poços de visita', categoria: 'Ampliação' },
+                { estaca: '30+1,20', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '32+8,00', tipo: 'BTTC ø=0,80', diretriz: 'Projetado com 17,0 metros', categoria: 'Projetado' },
+                { estaca: '32+11,40', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 6,0 metros para o lado direito e desobstruir montante', categoria: 'Ampliação' },
+                { estaca: '42+17,50', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 9,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '43+5,00', tipo: 'BTCC 2,00x1,00', diretriz: 'Projetado com 17,0 metros', categoria: 'Projetado' },
+                { estaca: '55+10,70', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '62+0,80', tipo: 'BDTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '63+10,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '66+1,40', tipo: 'BDCC 1,00x1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '71+15,00', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '80+7,60', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '89+7,20', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '100+15,20', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 4,0 metros para o lado esquerdo e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
+                { estaca: '105+5,50', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
+                { estaca: '114+4,60', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e recuperar a boca de jusante', categoria: 'Ampliação' },
+                { estaca: '122+8,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '135+15,00', tipo: 'BDCC 2,00x2,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '150+16,30', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '151', tipo: 'BTTC ø=0,80', diretriz: 'Projetado com 14,0 metros', categoria: 'Projetado' },
+                { estaca: '159+18,70', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '160', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '160+4,00', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '160+10,00', tipo: 'BTCC 2,00x1,50', diretriz: 'Projetado com 15,0 metros', categoria: 'Projetado' },
+                { estaca: '220+6,60', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=2,0 metros', categoria: 'Ampliação' },
+                { estaca: '235+2,40', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e reconstruir caixa de montante', categoria: 'Ampliação' },
+                { estaca: '238+5,85', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir dissipador de energia com h=5,0 metros e caixa de montante', categoria: 'Ampliação' },
+                { estaca: '248+19,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '249+5,00', tipo: 'BTTC ø=1,00', diretriz: 'Projetado com 16,0 metros', categoria: 'Projetado' },
+                { estaca: '264+3,40', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '268+10,90', tipo: 'BDTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 17,0 metros e caixa de montante', categoria: 'Projetado' },
+                { estaca: '272+7,50', tipo: 'BDTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 12,0 metros e caixa de montante', categoria: 'Projetado' },
+                { estaca: '277+13,20', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '288+14,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
+                { estaca: '314+4,90', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado direito, construir caixa de montante e galeria com 140 m de ø = 0,80m, 05 bocas de lobo e 01 poço de visita', categoria: 'Ampliação' },
+                { estaca: '326+7,00', tipo: 'BDTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 13,0 metros e caixa de montante', categoria: 'Projetado' },
+                { estaca: '326+10,00', tipo: 'BTTC ø=0,80', diretriz: 'Projetado com 13,0 metros, caixa de montante e valeta de jusante com 50 metros', categoria: 'Projetado' },
+                { estaca: '352+6,15', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante e valeta de jusante com 50 metros', categoria: 'Ampliação' },
+                { estaca: '352+10,00', tipo: 'BTTC ø=1,00', diretriz: 'Projetado com 13,0 metros, caixa de montante e valeta de jusante com 50 metros', categoria: 'Projetado' },
+                { estaca: '361+5,70', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
+                { estaca: '364+19,20', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 10,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '376+2,30', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado direito e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
+                { estaca: '382+9,70', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '387+11,00', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=2,0 metros', categoria: 'Ampliação' },
+                { estaca: '391+12,50', tipo: 'BDCC 2,50x2,50', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '397+18,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
+                { estaca: '408+10,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir caixa de montante e dissipador com h=5,0 metros', categoria: 'Ampliação' },
+                { estaca: '419', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir caixa de montante e dissipador com h=3,0 metros', categoria: 'Ampliação' },
+                { estaca: '433+4,80', tipo: 'BTTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
+                { estaca: '446+14,60', tipo: 'BDCC 3,00x2,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '455+0,70', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado direito e construir caixa de montante', categoria: 'Ampliação' },
+                { estaca: '461+14,20', tipo: 'BDCC 3,00x2,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '468', tipo: 'BDCC 2,50x2,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '470', tipo: 'BSTC ø=1,00', diretriz: 'Projetado com 13,0 metros e caixa de montante', categoria: 'Projetado' },
+                { estaca: '477+7,10', tipo: 'BDCC 2,50x2,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador com h=3,0 metros', categoria: 'Ampliação' },
+                { estaca: '483+10,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Remover BSCC 1,00x1,00 m e construir obra projetada com 13,0 metros, caixa de montante e dissipador de energia com h=3,0 metros', categoria: 'Projetado' },
+                { estaca: '488+12,30', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=4,0 metros', categoria: 'Ampliação' },
+                { estaca: '512+5,00', tipo: 'BTTC ø=1,00', diretriz: 'Projetado com 14,0 metros', categoria: 'Projetado' },
+                { estaca: '512+10,30', tipo: 'BDTC ø=1,00', diretriz: 'Executar limpeza, ampliar 5,0 metros para o lado esquerdo e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
+                { estaca: '529+7,90', tipo: 'BSTC ø=1,00', diretriz: 'Remover BSTC ø=1,00 m', categoria: 'Projetado' },
+                { estaca: '529+15,80', tipo: 'BSTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 17,0 metros e caixa de montante', categoria: 'Projetado' },
+                { estaca: '540+8,00', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 8,0 metros para o lado esquerdo e construir galeria 232 m de ø = 0,80m, 44 m de ø = 0,60m e 10 bocas de lobo', categoria: 'Ampliação' },
+                { estaca: '565+17,80', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '566', tipo: 'BDTC ø=1,00', diretriz: 'Projetado com 17,0 metros', categoria: 'Projetado' },
+                { estaca: '581+17,45', tipo: 'BTTC ø=1,00', diretriz: 'Executar limpeza e ampliar 4,0 metros para o lado esquerdo e 2,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '588+11,05', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '598', tipo: 'GALERIA ø=0,80', diretriz: 'Executar galeria projetada com 135 m de ø = 0,80m, 05 bocas de lobo e 02 poços de visita', categoria: 'Projetado' },
+                { estaca: '602', tipo: 'BTCC 2,00x2,50', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '615+19,30', tipo: 'BSCC 2,00x1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado esquerdo', categoria: 'Ampliação' },
+                { estaca: '625+11,60', tipo: 'BDTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo e 6,0 metros para o lado direito', categoria: 'Ampliação' },
+                { estaca: '640+5,00', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 6,0 metros para o lado direito e ampliar galeria existente com 155 m de ø = 0,80m, 55 m de ø = 0,60m e 18 bocas de lobo', categoria: 'Ampliação' },
+                { estaca: '646+14,00', tipo: 'PONTE L=35,20', diretriz: 'Executar rejuvenescimento da estrutura', categoria: 'Recuperação' }
             ];
-            for (const item of dbInicialOAC) await addDoc(oacRef, item);
+
+            for (const item of listaCompleta) {
+                await addDoc(oacRef, {
+                    estaca: item.estaca,
+                    tipo: item.tipo,
+                    diretrizProjeto: item.diretriz,
+                    categoria: item.categoria,
+                    status: 'pendente',
+                    extensao: '',
+                    bocas: 0,
+                    redentes: '',
+                    recravas: '',
+                    obs: '',
+                    concluido: false
+                });
+            }
         }
 
         window.salvarDiagrama = async function() {
@@ -397,6 +490,7 @@
             window.oacSelecionadaId = id;
 
             document.getElementById('modal-oac-title').innerText = `Editar Bueiro - Est. ${oac.estaca} (${oac.tipo})`;
+            document.getElementById('modal-oac-diretriz').innerText = oac.diretrizProjeto || 'Diretriz não informada.';
             document.getElementById('modal-oac-tipo').value = oac.categoria || 'Ampliação';
             document.getElementById('modal-oac-tipo').disabled = window.usuarioLogado.role !== 'admin';
             document.getElementById('modal-oac-extensao').value = oac.extensao || '';
@@ -443,11 +537,10 @@
             alert('Avanço do bueiro atualizado na nuvem!');
         }
 
-        // --- MOTOR DE GERAÇÃO PDF CORRIGIDO ---
+        // A Lógica do PDF continua a mesma
         window.gerarPlantaPDF = async function() {
             try {
                 alert('Aguarde, processando as cores e gerando o PDF...');
-
                 const urlBase = 'base_diagrama.pdf';
                 const existingPdfBytes = await fetch(urlBase).then(res => {
                     if(!res.ok) throw new Error('Arquivo "base_diagrama.pdf" não encontrado.');
@@ -458,67 +551,40 @@
                 const pdfDoc = await PDFDocument.load(existingPdfBytes);
                 const pages = pdfDoc.getPages();
                 
-                // Dicionário Oficial de Cores (RGB de 0 a 1)
                 const cores = {
-                    'Limpeza/Supressão': rgb(0.13, 0.55, 0.13), // Verde Escuro
-                    'Terraplenagem': rgb(0.93, 0.46, 0.0),      // Laranja
-                    'Regularização': rgb(0.55, 0.27, 0.07),     // Marrom
-                    'Sub Base': rgb(0.2, 0.6, 1.0),             // Azul Claro
-                    'Base': rgb(0.5, 0.0, 0.5),                 // Roxo
-                    'Imprimação': rgb(0.4, 0.4, 0.4),           // Cinza
-                    'TSD': rgb(0.1, 0.1, 0.1),                  // Preto
-                    'Em Execução': rgb(0.99, 0.82, 0.30)        // Amarelo
+                    'Limpeza/Supressão': rgb(0.13, 0.55, 0.13), 'Terraplenagem': rgb(0.93, 0.46, 0.0), 'Regularização': rgb(0.55, 0.27, 0.07),
+                    'Sub Base': rgb(0.2, 0.6, 1.0), 'Base': rgb(0.5, 0.0, 0.5), 'Imprimação': rgb(0.4, 0.4, 0.4),
+                    'TSD': rgb(0.1, 0.1, 0.1), 'Em Execução': rgb(0.99, 0.82, 0.30)
                 };
 
-                // Desenhando a Legenda na Página 1
                 const page1 = pages[0];
                 const { height } = page1.getSize(); 
-
-                // Y=0 é no fundo. height é o topo (aprox 595 pontos).
-                let legX = 40;
-                let legY = height - 30; // 30 pontos descendo do topo
+                let legX = 40; let legY = height - 30; 
                 
                 page1.drawText('LEGENDA DE SERVIÇOS (CONCLUÍDOS):', { x: legX, y: legY + 12, size: 9, color: rgb(0,0,0) });
-                
                 const desenharLegenda = (texto, cor, posX, posY) => {
                     page1.drawRectangle({ x: posX, y: posY, width: 10, height: 10, color: cor });
                     page1.drawText(texto, { x: posX + 15, y: posY + 2, size: 8 });
                 };
 
-                // Plotando as cores da legenda na folha
-                desenharLegenda('Em Execução', cores['Em Execução'], legX, legY - 5);
-                desenharLegenda('Limpeza', cores['Limpeza/Supressão'], legX + 80, legY - 5);
-                desenharLegenda('Terraplenagem', cores['Terraplenagem'], legX + 140, legY - 5);
-                desenharLegenda('Regul.', cores['Regularização'], legX + 230, legY - 5);
-                desenharLegenda('Sub Base', cores['Sub Base'], legX + 280, legY - 5);
-                desenharLegenda('Base', cores['Base'], legX + 340, legY - 5);
-                desenharLegenda('Imprimação', cores['Imprimação'], legX + 390, legY - 5);
-                desenharLegenda('TSD', cores['TSD'], legX + 460, legY - 5);
+                desenharLegenda('Em Execução', cores['Em Execução'], legX, legY - 5); desenharLegenda('Limpeza', cores['Limpeza/Supressão'], legX + 80, legY - 5);
+                desenharLegenda('Terraplenagem', cores['Terraplenagem'], legX + 140, legY - 5); desenharLegenda('Regul.', cores['Regularização'], legX + 230, legY - 5);
+                desenharLegenda('Sub Base', cores['Sub Base'], legX + 280, legY - 5); desenharLegenda('Base', cores['Base'], legX + 340, legY - 5);
+                desenharLegenda('Imprimação', cores['Imprimação'], legX + 390, legY - 5); desenharLegenda('TSD', cores['TSD'], legX + 460, legY - 5);
 
-                // Organizando dados lançados (salva a cor mais atual daquela estaca)
                 const roadStatus = new Array(649).fill(null);
                 const registrosOrdemCronologica = [...window.registrosDiagrama].reverse();
                 
                 registrosOrdemCronologica.forEach(reg => {
-                    let inicio = parseInt(reg.estIni);
-                    let fim = parseInt(reg.estFin);
-                    for(let i = inicio; i <= fim; i++) {
-                        if(i <= 648) {
-                            roadStatus[i] = { status: reg.status, servico: reg.servico };
-                        }
-                    }
+                    let inicio = parseInt(reg.estIni); let fim = parseInt(reg.estFin);
+                    for(let i = inicio; i <= fim; i++) { if(i <= 648) { roadStatus[i] = { status: reg.status, servico: reg.servico }; } }
                 });
 
-                // Lógica de Linhas (Row) baseada nas 3 fileiras do seu Excel
                 for (let i = 0; i <= 648; i++) {
                     if (roadStatus[i] && roadStatus[i].status !== 'Pendente') {
                         let corAplicada = roadStatus[i].status === 'Concluído' ? cores[roadStatus[i].servico] : cores['Em Execução'];
-                        
-                        let pageIndex = 0;
-                        let rowIndex = 0;
-                        let posNaLinha = 0;
+                        let pageIndex = 0; let rowIndex = 0; let posNaLinha = 0;
 
-                        // Mapeamento que reflete a exata quebra de linha do seu PDF
                         if (i <= 120) { pageIndex = 0; rowIndex = 0; posNaLinha = i; }
                         else if (i <= 241) { pageIndex = 0; rowIndex = 1; posNaLinha = i - 121; }
                         else if (i <= 362) { pageIndex = 0; rowIndex = 2; posNaLinha = i - 242; }
@@ -529,22 +595,14 @@
                         let paginaAtual = pages[pageIndex];
                         if (!paginaAtual) continue; 
 
-                        // Eixo Y: Primeira linha desce um pouco do topo, a segunda desce mais...
                         let yBase;
                         if (rowIndex === 0) yBase = height - 200; 
                         if (rowIndex === 1) yBase = height - 370; 
                         if (rowIndex === 2) yBase = height - 540; 
-
-                        // Eixo X: Afasta da margem esquerda e avança baseado no número da estaca
                         let xBase = 50 + (posNaLinha * 6.5); 
                         
                         paginaAtual.drawRectangle({
-                            x: xBase,
-                            y: yBase,
-                            width: 6.5,
-                            height: 30, // Pinta como um "marca-texto" cobrindo a altura das faixas
-                            color: corAplicada,
-                            opacity: 0.65 // Translúcido para não tampar os textos e linhas pretas originais do seu Excel
+                            x: xBase, y: yBase, width: 6.5, height: 30, color: corAplicada, opacity: 0.65
                         });
                     }
                 }
@@ -555,11 +613,7 @@
                 link.href = URL.createObjectURL(blob);
                 link.download = 'Planta_Iluminada_CE388_Atualizada.pdf';
                 link.click();
-                
-            } catch (error) {
-                console.error(error);
-                alert('Erro ao gerar PDF: ' + error.message);
-            }
+            } catch (error) { console.error(error); alert('Erro ao gerar PDF: ' + error.message); }
         }
     </script>
 </body>
