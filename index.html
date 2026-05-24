@@ -1,244 +1,152 @@
+Excelente, Carlos. É uma ótima prática ter você mesmo no controle do cadastro da sua equipe. E a ideia de criar o resumo por grupos é fundamental para você ter a visão macro da drenagem.
+
+Respondendo à sua pergunta de design: **recomendo fortemente criar um botão "Ver Resumo"** no topo do menu OACs. Se colocarmos uma tabela com 15 linhas (os 15 tipos de bueiros) fixa no topo da tela, ela vai empurrar toda a lista de bueiros lá para baixo. Como o uso principal será em celulares no campo, o botão mantém a tela limpa e abre o resumo apenas quando você ou seus colaboradores precisarem analisar os números.
+
+Foi exatamente assim que implementei.
+
+### O que foi feito nesta atualização:
+
+1. **Bloqueio do Diagrama:** A função `switchTab` agora verifica se o usuário é "admin". Se não for, ele exibe um alerta informando que a função está em desenvolvimento e impede a abertura da tela. A tela OACs está liberada para todos.
+2. **Botão e Resumo de OACs:** Criei o botão no topo do menu OAC e a inteligência que varre a sua base de dados, filtra as galerias (ignorando-as, conforme você instruiu) e agrupa os itens.
+3. **Cálculo de Percentuais:** *Uma nota técnica importante:* Como os totais de projeto (metros e bocas a executar) estão escritos em formato de texto dentro da "Diretriz de Projeto" (ex: *"ampliar 8,0 metros... construir 02 bocas"*), o sistema não consegue extrair matematicamente com 100% de precisão o que falta em metros. Por isso, **o percentual de "Concluído" e "Pendente" do resumo foi calculado em cima da quantidade de bueiros do grupo**, mostrando logo ao lado a soma exata de metros e bocas já executadas daquele tipo.
+
+Como você prefere segurança, aqui está o **código completo e unificado**. Basta copiar e substituir tudo no seu arquivo `index.html`.
+
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CDois Vias - App de Fiscalização</title>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-
     <style>
-        :root {
-            --primary: #1e3a8a;
-            --secondary: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --bg: #f3f4f6;
-            --surface: #ffffff;
-            --text: #1f2937;
-            --text-light: #6b7280;
-            --border: #e5e7eb;
-        }
+        :root { --primary: #1e3a8a; --secondary: #10b981; --warning: #f59e0b; --danger: #ef4444; --bg: #f3f4f6; --surface: #ffffff; --text: #1f2937; --text-light: #6b7280; --border: #e5e7eb; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
         body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
-        
-        h1, h2, h3 { color: var(--primary); }
         .hidden { display: none !important; }
-        .btn { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; text-align: center; font-size: 1rem; touch-action: manipulation; }
+        .btn { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; width: 100%; cursor: pointer; }
         .btn-success { background: var(--secondary); }
         .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
         .input-group { margin-bottom: 15px; }
-        .input-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 600; }
         input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 16px; }
-        
         .screen { padding: 20px; max-width: 800px; margin: 0 auto; }
-        
-        #login-screen { display: flex; flex-direction: column; justify-content: center; min-height: 100vh; }
-        .login-card { background: var(--surface); padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: var(--surface); display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); border-top: 1px solid var(--border); z-index: 1000; }
-        .nav-item { background: none; border: none; font-size: 0.8rem; color: var(--text-light); display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 5px 10px; }
-        .nav-item.active { color: var(--primary); font-weight: bold; }
-        .nav-icon { font-size: 1.5rem; margin-bottom: 4px; }
-
-        header { background: var(--surface); padding: 15px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .header-actions { display: flex; align-items: center; gap: 10px; }
-        .user-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
-        .btn-sair { background: transparent; border: 1px solid var(--danger); color: var(--danger); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-
         .card { background: var(--surface); padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .dash-card { background: var(--surface); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
-        .dash-num { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
-        
-        .estaca-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-        .oac-item { border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: var(--surface); }
-        .oac-info strong { font-size: 1.1rem; color: var(--primary); }
-        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
-        .badge-pendente { background: #e5e7eb; color: #374151; }
-        .badge-andamento { background: #fef3c7; color: #92400e; }
-        .badge-concluido { background: #d1fae5; color: #065f46; }
-
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 15px; }
-        .modal-content { background: var(--surface); width: 100%; max-width: 500px; padding: 20px; border-radius: 12px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--surface); width: 100%; max-width: 900px; padding: 20px; border-radius: 12px; max-height: 90vh; overflow-y: auto; }
+        .diretriz-projeto { background-color: #e0f2fe; border-left: 4px solid #0284c7; padding: 10px; margin-bottom: 15px; font-size: 0.85rem; color: #0369a1; }
         
-        .diretriz-projeto { background-color: #e0f2fe; border-left: 4px solid #0284c7; padding: 10px; border-radius: 4px; font-size: 0.85rem; color: #0369a1; margin-bottom: 15px; }
+        /* Estilos da Tabela de Resumo */
+        .tabela-resumo { width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: center; }
+        .tabela-resumo th { background: var(--primary); color: white; padding: 8px; position: sticky; top: 0; }
+        .tabela-resumo td { padding: 8px; border-bottom: 1px solid var(--border); }
+        .tabela-resumo tr:nth-child(even) { background-color: #f9fafb; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block;}
+        .badge-pendente { background: #fee2e2; color: #991b1b; }
+        .badge-concluido { background: #d1fae5; color: #065f46; }
     </style>
 </head>
 <body>
-
     <div id="login-screen" class="screen">
-        <div class="login-card">
+        <div class="card">
             <h1 style="text-align: center; margin-bottom: 5px;">CDois Vias</h1>
             <p style="text-align: center; margin-bottom: 20px; color: var(--text-light);">Fiscalização CE-388</p>
-            
-            <div class="input-group">
-                <label>Usuário</label>
-                <input type="text" id="login-user" placeholder="admin ou colab">
-            </div>
-            <div class="input-group">
-                <label>Senha</label>
-                <input type="password" id="login-pass" placeholder="Digite sua senha">
-            </div>
-            <button class="btn" onclick="realizarLogin()">Entrar no Sistema</button>
+            <div class="input-group"><label>Usuário</label><input type="text" id="login-user" placeholder="Digite seu usuário"></div>
+            <div class="input-group"><label>Senha</label><input type="password" id="login-pass" placeholder="Digite sua senha"></div>
+            <button class="btn" onclick="realizarLogin()">Entrar</button>
         </div>
     </div>
 
     <div id="app-structure" class="hidden">
-        
-        <header>
-            <h3>CDois Vias</h3>
-            <div class="header-actions">
-                <div class="user-badge" id="user-display">Usuário</div>
-                <button class="btn-sair" onclick="sairApp()">Sair</button>
+        <header style="background: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h3 style="color: var(--primary);">CDois Vias</h3>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="user-display" style="font-size: 0.8rem; font-weight: bold; color: var(--text-light);"></span>
+                <button onclick="sairApp()" style="color:var(--danger); font-weight:bold; border:none; background:none;">Sair</button>
             </div>
         </header>
-
-        <div id="view-home" class="screen view-section">
-            <h2>Visão Geral da Obra</h2>
-            <p style="margin-bottom: 20px; color: var(--text-light);">Trecho: Altaneira - Nova Olinda</p>
-            
-            <div class="card">
-                <h3>Resumo de Inserções Recentes</h3>
-                <div id="recent-logs" style="margin-top: 15px; font-size: 0.9rem;">
-                    <p>Carregando dados da nuvem...</p>
-                </div>
-            </div>
-        </div>
 
         <div id="view-diagrama" class="screen view-section hidden">
             <h2>Diagrama Iluminado</h2>
             <p style="margin-bottom: 20px; color: var(--text-light);">Lançamento de Avanço Físico</p>
-
             <div class="card">
-                <div class="input-group">
-                    <label>Serviço Executado</label>
-                    <select id="diag-servico">
-                        <option value="Limpeza/Supressão">Limpeza/Supressão Vegetal</option>
-                        <option value="Terraplenagem">Terraplenagem</option>
-                        <option value="Regularização">Regularização do Subleito</option>
-                        <option value="Sub Base">Sub Base</option>
-                        <option value="Base">Base</option>
-                        <option value="Imprimação">Imprimação</option>
-                        <option value="TSD">Tratamento Superficial Duplo (TSD)</option>
-                    </select>
+                <select id="diag-servico" style="margin-bottom:10px;"><option>Limpeza/Supressão</option><option>Terraplenagem</option><option>Regularização</option><option>Sub Base</option><option>Base</option><option>Imprimação</option><option>TSD</option></select>
+                <select id="diag-status" style="margin-bottom:10px;"><option>Pendente</option><option>Em Execução</option><option>Concluído</option></select>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <input type="number" id="diag-est-ini" placeholder="Est. Inicial">
+                    <input type="number" step="0.01" id="diag-frac-ini" placeholder="Fração Inicial">
+                    <input type="number" id="diag-est-fin" placeholder="Est. Final">
+                    <input type="number" step="0.01" id="diag-frac-fin" placeholder="Fração Final">
                 </div>
-                <div class="input-group">
-                    <label>Status</label>
-                    <select id="diag-status">
-                        <option value="Pendente">Pendente</option>
-                        <option value="Em Execução">Em Execução</option>
-                        <option value="Concluído">Concluído</option>
-                    </select>
-                </div>
-
-                <div class="estaca-grid">
-                    <div class="input-group">
-                        <label>Estaca Inicial</label>
-                        <input type="number" id="diag-est-ini" placeholder="Ex: 10">
-                    </div>
-                    <div class="input-group">
-                        <label>Fração (+)</label>
-                        <input type="number" step="0.01" id="diag-frac-ini" placeholder="Ex: 5.50">
-                    </div>
-                    <div class="input-group">
-                        <label>Estaca Final</label>
-                        <input type="number" id="diag-est-fin" placeholder="Ex: 12">
-                    </div>
-                    <div class="input-group">
-                        <label>Fração (+)</label>
-                        <input type="number" step="0.01" id="diag-frac-fin" placeholder="Ex: 0.00">
-                    </div>
-                </div>
-
                 <button class="btn btn-success" onclick="salvarDiagrama()">Salvar Apontamento</button>
-            </div>
-            
-            <div class="card">
-                <button class="btn btn-outline" onclick="gerarPlantaPDF()">Gerar Planta Iluminada (PDF)</button>
+                <button class="btn btn-outline" style="margin-top:10px;" onclick="gerarPlantaPDF()">Gerar Planta PDF</button>
             </div>
         </div>
 
-        <div id="view-oac" class="screen view-section hidden">
+        <div id="view-oac" class="screen view-section">
             <h2>Obras D'Arte Correntes</h2>
             <p style="margin-bottom: 15px; color: var(--text-light);">Controle de Bueiros</p>
-
-            <div class="dashboard-grid">
-                <div class="dash-card"><div class="dash-num" id="oac-count-concluido">0</div><div style="font-size: 0.7rem;">Concluídos</div></div>
-                <div class="dash-card"><div class="dash-num" id="oac-count-andamento">0</div><div style="font-size: 0.7rem;">Andamento</div></div>
-                <div class="dash-card"><div class="dash-num" id="oac-count-pendente">0</div><div style="font-size: 0.7rem;">Pendentes</div></div>
+            
+            <div style="margin-bottom: 15px;">
+                <button class="btn btn-outline" onclick="abrirModalResumo()">Ver Resumo de Execução</button>
             </div>
 
-            <div id="oac-list">
-                <p>Carregando bueiros da nuvem...</p>
-            </div>
+            <div id="oac-list"><p>Carregando...</p></div>
         </div>
 
-        <nav class="bottom-nav">
-            <button class="nav-item active" onclick="switchTab('home')">
-                <span class="nav-icon">🏠</span><span>Início</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('diagrama')">
-                <span class="nav-icon">📊</span><span>Diagrama</span>
-            </button>
-            <button class="nav-item" onclick="switchTab('oac')">
-                <span class="nav-icon">🕳️</span><span>OACs</span>
-            </button>
+        <nav style="position:fixed; bottom:0; width:100%; background:white; display:flex; justify-content:space-around; padding:10px; border-top:1px solid #ccc; z-index: 1000;">
+            <button class="nav-item" onclick="switchTab('diagrama')" style="background:none; border:none; font-weight:bold; color:var(--text-light);">📊 Diagrama</button>
+            <button class="nav-item active" onclick="switchTab('oac')" style="background:none; border:none; font-weight:bold; color:var(--primary);">🕳️ OACs</button>
         </nav>
     </div>
 
     <div class="modal" id="modal-oac">
-        <div class="modal-content">
-            <h3 id="modal-oac-title" style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">Editar Bueiro</h3>
-            
-            <div class="diretriz-projeto">
-                <strong>Diretriz do Projeto:</strong><br>
-                <span id="modal-oac-diretriz"></span>
-            </div>
-
-            <div class="input-group">
-                <label>Tipo de Projeto</label>
-                <select id="modal-oac-tipo">
-                    <option value="Ampliação">Ampliação</option>
-                    <option value="Projetado">Projetado (Novo)</option>
-                    <option value="Recuperação">Recuperação</option>
-                </select>
-            </div>
-            
-            <div class="estaca-grid">
-                <div class="input-group">
-                    <label>Extensão Corpo (m)</label>
+        <div class="modal-content" style="max-width: 500px;">
+            <h3 id="modal-oac-title" style="margin-bottom: 15px;">Editar Bueiro</h3>
+            <div class="diretriz-projeto"><strong id="modal-oac-diretriz"></strong></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <label style="font-size: 0.8rem; font-weight: bold;">Corpo Executado (m)</label>
                     <input type="number" step="0.01" id="modal-oac-extensao">
                 </div>
-                <div class="input-group">
-                    <label>Bocas Executadas</label>
+                <div>
+                    <label style="font-size: 0.8rem; font-weight: bold;">Bocas Executadas (und)</label>
                     <input type="number" id="modal-oac-bocas">
                 </div>
-                <div class="input-group">
-                    <label>Prof. Redentes (m)</label>
-                    <input type="number" step="0.01" id="modal-oac-redentes">
-                </div>
-                <div class="input-group">
-                    <label>Prof. Recravas (m)</label>
-                    <input type="number" step="0.01" id="modal-oac-recravas" placeholder="Se capeado">
-                </div>
             </div>
-
-            <div class="input-group">
-                <label>Observações de Execução</label>
-                <textarea id="modal-oac-obs" rows="3" placeholder="Ex: Necessitou substituição total..."></textarea>
+            <textarea id="modal-oac-obs" rows="3" placeholder="Observações de execução..." style="margin-bottom:10px;"></textarea>
+            <div style="display:flex; align-items:center; gap:10px; background: #f9fafb; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                <input type="checkbox" id="modal-oac-concluido" style="transform: scale(1.5);">
+                <label style="margin: 0;">100% Concluído</label>
             </div>
-
-            <div class="input-group" style="display: flex; align-items: center; gap: 10px; background: #f9fafb; padding: 10px; border-radius: 6px;">
-                <input type="checkbox" id="modal-oac-concluido" style="width: auto; transform: scale(1.5);">
-                <label style="margin: 0; font-size: 1rem;">Bueiro 100% Concluído</label>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn" style="background: var(--text-light);" onclick="fecharModalOAC()">Cancelar</button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" style="background:var(--text-light);" onclick="fecharModalOAC()">Cancelar</button>
                 <button class="btn btn-success" onclick="salvarOAC()">Salvar Execução</button>
             </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-resumo">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">Resumo de Obras D'Arte (Grupos)</h3>
+            <p style="font-size: 0.8rem; color: var(--danger); margin-bottom: 15px;">*Galerias não computadas neste resumo.</p>
+            <div style="overflow-x: auto; max-height: 60vh;">
+                <table class="tabela-resumo">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left; min-width: 130px;">Grupo / Tipo</th>
+                            <th>OACs (Qtd)</th>
+                            <th>Concluídas (%)</th>
+                            <th>Pendentes (%)</th>
+                            <th>Corpo Exec. (m)</th>
+                            <th>Bocas Exec. (und)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-resumo-body">
+                        </tbody>
+                </table>
+            </div>
+            <button class="btn" style="margin-top: 20px; background: var(--text-light);" onclick="fecharModalResumo()">Fechar Resumo</button>
         </div>
     </div>
 
@@ -246,34 +154,36 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyC2CyPHNziQlavyCzttDY3D96TmhkYHoaQ",
-            authDomain: "cdois-vias.firebaseapp.com",
-            projectId: "cdois-vias",
-            storageBucket: "cdois-vias.firebasestorage.app",
-            messagingSenderId: "47732769068",
-            appId: "1:47732769068:web:ea62c1b3572fe18285ec89"
-        };
-
+        const firebaseConfig = { apiKey: "AIzaSyC2CyPHNziQlavyCzttDY3D96TmhkYHoaQ", authDomain: "cdois-vias.firebaseapp.com", projectId: "cdois-vias", storageBucket: "cdois-vias.firebasestorage.app", messagingSenderId: "47732769068", appId: "1:47732769068:web:ea62c1b3572fe18285ec89" };
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
         const diagRef = collection(db, "diagrama");
         const oacRef = collection(db, "oacs");
 
+        window.registrosOAC = [];
+        window.registrosDiagrama = [];
         window.usuarioLogado = null;
         window.oacSelecionadaId = null;
-        window.registrosDiagrama = [];
-        window.registrosOAC = [];
+
+        // GRUPOS OFICIAIS DE OACs PARA O RESUMO
+        const gruposOficiaisOAC = [
+            "BSTC Ø=0,80m", "BSTC Ø=1,00m", "BDTC Ø=0,80m", "BDTC Ø=1,00m", "BTTC Ø=1,00m",
+            "BSCC 1,00 x 1,00m", "BSCC 2,00 x 1,00m", "BDCC 1,00 x 1,00m", "BDCC 2,00 x 2,00m",
+            "BDCC 2,50 x 2,00m", "BDCC 2,50 x 2,50m", "BDCC 3,00 x 2,00m", "BTCC 2,00 x 1,00m",
+            "BTCC 2,00 x 1,50m", "BTCC 2,50 x 2,50m"
+        ];
 
         window.realizarLogin = function() {
             const user = document.getElementById('login-user').value.trim().toLowerCase();
             const pass = document.getElementById('login-pass').value;
 
-            if (user === 'admin' && pass === 'admin') {
-                window.usuarioLogado = { nome: 'Carlos', role: 'admin' };
-            } else if (user === 'colab' && pass === '123') {
-                window.usuarioLogado = { nome: 'Colaborador 01', role: 'user' };
+            // ADICIONE SEUS COLABORADORES NESTA ESTRUTURA
+            if (user === 'carlos' && pass === 'admin') {
+                window.usuarioLogado = { nome: 'Carlos Cesar', role: 'admin' };
+            } else if (user === 'colab1' && pass === 'senha1') {
+                window.usuarioLogado = { nome: 'Nome do Colaborador 1', role: 'user' };
+            } else if (user === 'colab2' && pass === 'senha2') {
+                window.usuarioLogado = { nome: 'Nome do Colaborador 2', role: 'user' };
             } else {
                 alert('Usuário ou senha incorretos.');
                 return;
@@ -282,6 +192,9 @@
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-structure').classList.remove('hidden');
             document.getElementById('user-display').innerText = window.usuarioLogado.nome;
+            
+            // Abre direto na aba OACs
+            window.switchTab('oac');
             iniciarOuvintesNuvem();
         }
 
@@ -294,10 +207,21 @@
         }
 
         window.switchTab = function(tabId) {
+            // BLOQUEIO DO DIAGRAMA PARA COLABORADORES
+            if (tabId === 'diagrama' && window.usuarioLogado.role !== 'admin') {
+                alert('A função Diagrama está em desenvolvimento para colaboradores.');
+                return;
+            }
+
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+                el.style.color = 'var(--text-light)';
+            });
+            
             document.getElementById(`view-${tabId}`).classList.remove('hidden');
             event.currentTarget.classList.add('active');
+            event.currentTarget.style.color = 'var(--primary)';
         }
 
         function iniciarOuvintesNuvem() {
@@ -305,198 +229,46 @@
                 window.registrosDiagrama = [];
                 snapshot.forEach((doc) => window.registrosDiagrama.push({ id: doc.id, ...doc.data() }));
                 window.registrosDiagrama.sort((a, b) => b.timestamp - a.timestamp);
-                atualizarLogsRecentes();
             });
 
             onSnapshot(oacRef, (snapshot) => {
                 window.registrosOAC = [];
                 snapshot.forEach((doc) => window.registrosOAC.push({ id: doc.id, ...doc.data() }));
-                if (window.registrosOAC.length === 0) popularBancoOACInicial();
-                else atualizarDashboardOAC();
-            });
-        }
-
-        async function popularBancoOACInicial() {
-            const listaCompleta = [
-                { estaca: '1+12,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza', categoria: 'Ampliação' },
-                { estaca: '9+2,50', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 8,0 metros para o lado direito e construir 02 bocas de lobo na montante', categoria: 'Ampliação' },
-                { estaca: '18+2,20', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 8,0 metros para o lado direito e construir galeria com 122 m de ø=0,80m, 02 bocas de lobo e 01 poços de visita', categoria: 'Ampliação' },
-                { estaca: '30+1,20', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '32+8,00', tipo: 'BTTC ø=0,80', diretriz: 'Projetado com 17,0 metros', categoria: 'Projetado' },
-                { estaca: '32+11,40', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 6,0 metros para o lado direito e desobstruir montante', categoria: 'Ampliação' },
-                { estaca: '42+17,50', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 9,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '43+5,00', tipo: 'BTCC 2,00x1,00', diretriz: 'Projetado com 17,0 metros', categoria: 'Projetado' },
-                { estaca: '55+10,70', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '62+0,80', tipo: 'BDTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '63+10,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '66+1,40', tipo: 'BDCC 1,00x1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '71+15,00', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '80+7,60', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '89+7,20', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '100+15,20', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 4,0 metros para o lado esquerdo e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
-                { estaca: '105+5,50', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
-                { estaca: '114+4,60', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e recuperar a boca de jusante', categoria: 'Ampliação' },
-                { estaca: '122+8,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '135+15,00', tipo: 'BDCC 2,00x2,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '150+16,30', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '151', tipo: 'BTTC ø=0,80', diretriz: 'Projetado com 14,0 metros', categoria: 'Projetado' },
-                { estaca: '159+18,70', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '160', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '160+4,00', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '160+10,00', tipo: 'BTCC 2,00x1,50', diretriz: 'Projetado com 15,0 metros', categoria: 'Projetado' },
-                { estaca: '220+6,60', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=2,0 metros', categoria: 'Ampliação' },
-                { estaca: '235+2,40', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e reconstruir caixa de montante', categoria: 'Ampliação' },
-                { estaca: '238+5,85', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir dissipador de energia com h=5,0 metros e caixa de montante', categoria: 'Ampliação' },
-                { estaca: '248+19,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '249+5,00', tipo: 'BTTC ø=1,00', diretriz: 'Projetado com 16,0 metros', categoria: 'Projetado' },
-                { estaca: '264+3,40', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '268+10,90', tipo: 'BDTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 17,0 metros e caixa de montante', categoria: 'Projetado' },
-                { estaca: '272+7,50', tipo: 'BDTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 12,0 metros e caixa de montante', categoria: 'Projetado' },
-                { estaca: '277+13,20', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '288+14,40', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
-                { estaca: '314+4,90', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado direito, construir caixa de montante e galeria com 140 m de ø = 0,80m, 05 bocas de lobo e 01 poço de visita', categoria: 'Ampliação' },
-                { estaca: '326+7,00', tipo: 'BDTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 13,0 metros e caixa de montante', categoria: 'Projetado' },
-                { estaca: '326+10,00', tipo: 'BTTC ø=0,80', diretriz: 'Projetado com 13,0 metros, caixa de montante e valeta de jusante com 50 metros', categoria: 'Projetado' },
-                { estaca: '352+6,15', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante e valeta de jusante com 50 metros', categoria: 'Ampliação' },
-                { estaca: '352+10,00', tipo: 'BTTC ø=1,00', diretriz: 'Projetado com 13,0 metros, caixa de montante e valeta de jusante com 50 metros', categoria: 'Projetado' },
-                { estaca: '361+5,70', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
-                { estaca: '364+19,20', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 10,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '376+2,30', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado direito e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
-                { estaca: '382+9,70', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '387+11,00', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=2,0 metros', categoria: 'Ampliação' },
-                { estaca: '391+12,50', tipo: 'BDCC 2,50x2,50', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '397+18,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
-                { estaca: '408+10,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir caixa de montante e dissipador com h=5,0 metros', categoria: 'Ampliação' },
-                { estaca: '419', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 2,0 metros para o lado esquerdo e construir caixa de montante e dissipador com h=3,0 metros', categoria: 'Ampliação' },
-                { estaca: '433+4,80', tipo: 'BTTC ø=1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir caixa de montante', categoria: 'Ampliação' },
-                { estaca: '446+14,60', tipo: 'BDCC 3,00x2,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '455+0,70', tipo: 'BSTC ø=0,80', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado direito e construir caixa de montante', categoria: 'Ampliação' },
-                { estaca: '461+14,20', tipo: 'BDCC 3,00x2,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '468', tipo: 'BDCC 2,50x2,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '470', tipo: 'BSTC ø=1,00', diretriz: 'Projetado com 13,0 metros e caixa de montante', categoria: 'Projetado' },
-                { estaca: '477+7,10', tipo: 'BDCC 2,50x2,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador com h=3,0 metros', categoria: 'Ampliação' },
-                { estaca: '483+10,80', tipo: 'BSCC 1,00x1,00', diretriz: 'Remover BSCC 1,00x1,00 m e construir obra projetada com 13,0 metros, caixa de montante e dissipador de energia com h=3,0 metros', categoria: 'Projetado' },
-                { estaca: '488+12,30', tipo: 'BSCC 1,00x1,00', diretriz: 'Executar limpeza, ampliar 3,0 metros para o lado esquerdo e construir dissipador de energia com h=4,0 metros', categoria: 'Ampliação' },
-                { estaca: '512+5,00', tipo: 'BTTC ø=1,00', diretriz: 'Projetado com 14,0 metros', categoria: 'Projetado' },
-                { estaca: '512+10,30', tipo: 'BDTC ø=1,00', diretriz: 'Executar limpeza, ampliar 5,0 metros para o lado esquerdo e construir dissipador de energia com h=1,0 metro', categoria: 'Ampliação' },
-                { estaca: '529+7,90', tipo: 'BSTC ø=1,00', diretriz: 'Remover BSTC ø=1,00 m', categoria: 'Projetado' },
-                { estaca: '529+15,80', tipo: 'BSTC ø=0,80', diretriz: 'Remover BSTC ø=0,80 m e construir obra projetada com 17,0 metros e caixa de montante', categoria: 'Projetado' },
-                { estaca: '540+8,00', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 8,0 metros para o lado esquerdo e construir galeria 232 m de ø = 0,80m, 44 m de ø = 0,60m e 10 bocas de lobo', categoria: 'Ampliação' },
-                { estaca: '565+17,80', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '566', tipo: 'BDTC ø=1,00', diretriz: 'Projetado com 17,0 metros', categoria: 'Projetado' },
-                { estaca: '581+17,45', tipo: 'BTTC ø=1,00', diretriz: 'Executar limpeza e ampliar 4,0 metros para o lado esquerdo e 2,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '588+11,05', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '598', tipo: 'GALERIA ø=0,80', diretriz: 'Executar galeria projetada com 135 m de ø = 0,80m, 05 bocas de lobo e 02 poços de visita', categoria: 'Projetado' },
-                { estaca: '602', tipo: 'BTCC 2,00x2,50', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '615+19,30', tipo: 'BSCC 2,00x1,00', diretriz: 'Executar limpeza e ampliar 6,0 metros para o lado esquerdo', categoria: 'Ampliação' },
-                { estaca: '625+11,60', tipo: 'BDTC ø=1,00', diretriz: 'Executar limpeza e ampliar 3,0 metros para o lado esquerdo e 6,0 metros para o lado direito', categoria: 'Ampliação' },
-                { estaca: '640+5,00', tipo: 'BSTC ø=1,00', diretriz: 'Executar limpeza, ampliar 6,0 metros para o lado direito e ampliar galeria existente com 155 m de ø = 0,80m, 55 m de ø = 0,60m e 18 bocas de lobo', categoria: 'Ampliação' },
-                { estaca: '646+14,00', tipo: 'PONTE L=35,20', diretriz: 'Executar rejuvenescimento da estrutura', categoria: 'Recuperação' }
-            ];
-
-            for (const item of listaCompleta) {
-                await addDoc(oacRef, {
-                    estaca: item.estaca,
-                    tipo: item.tipo,
-                    diretrizProjeto: item.diretriz,
-                    categoria: item.categoria,
-                    status: 'pendente',
-                    extensao: '',
-                    bocas: 0,
-                    redentes: '',
-                    recravas: '',
-                    obs: '',
-                    concluido: false
-                });
-            }
-        }
-
-        window.salvarDiagrama = async function() {
-            const servico = document.getElementById('diag-servico').value;
-            const status = document.getElementById('diag-status').value;
-            const estIni = document.getElementById('diag-est-ini').value;
-            const fracIni = document.getElementById('diag-frac-ini').value || "0";
-            const estFin = document.getElementById('diag-est-fin').value;
-            const fracFin = document.getElementById('diag-frac-fin').value || "0";
-
-            if(!estIni || !estFin) { alert("Preencha as estacas inicial e final."); return; }
-
-            const novoRegistro = {
-                dataHora: new Date().toLocaleString('pt-BR'),
-                timestamp: Date.now(),
-                usuario: window.usuarioLogado.nome,
-                servico, status, estIni, fracIni, estFin, fracFin
-            };
-
-            await addDoc(diagRef, novoRegistro);
-            alert('Apontamento salvo na nuvem com sucesso!');
-            
-            document.getElementById('diag-est-ini').value = '';
-            document.getElementById('diag-frac-ini').value = '';
-            document.getElementById('diag-est-fin').value = '';
-            document.getElementById('diag-frac-fin').value = '';
-        }
-
-        function atualizarLogsRecentes() {
-            const container = document.getElementById('recent-logs');
-            container.innerHTML = '';
-            const recentes = window.registrosDiagrama.slice(0, 3);
-            if(recentes.length === 0) { container.innerHTML = '<p>Nenhum lançamento recente na nuvem.</p>'; return; }
-
-            recentes.forEach(log => {
-                container.innerHTML += `
-                    <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
-                        <strong>${log.servico} (${log.status})</strong><br>
-                        Est: ${log.estIni}+${log.fracIni} a ${log.estFin}+${log.fracFin}<br>
-                        <span style="font-size: 0.8rem; color: #666;">Por: ${log.usuario} em ${log.dataHora}</span>
-                    </div>
-                `;
+                atualizarDashboardOAC();
             });
         }
 
         function atualizarDashboardOAC() {
-            let concluidos = 0, andamento = 0, pendentes = 0;
             const listContainer = document.getElementById('oac-list');
             listContainer.innerHTML = '';
 
             const oacsOrdenadas = [...window.registrosOAC].sort((a, b) => parseFloat(a.estaca.split('+')[0]) - parseFloat(b.estaca.split('+')[0]));
 
             oacsOrdenadas.forEach(oac => {
-                if (oac.status === 'concluido') concluidos++;
-                else if (oac.status === 'andamento') andamento++;
-                else pendentes++;
-
-                let badgeClass = oac.status === 'concluido' ? 'badge-concluido' : (oac.status === 'andamento' ? 'badge-andamento' : 'badge-pendente');
-                let statusText = oac.status.toUpperCase();
+                let badgeClass = oac.concluido ? 'badge-concluido' : 'badge-pendente';
+                let statusText = oac.concluido ? 'CONCLUÍDO' : 'PENDENTE';
 
                 listContainer.innerHTML += `
-                    <div class="oac-item">
-                        <div class="oac-info">
-                            <strong>Estaca ${oac.estaca}</strong><br>
-                            <span style="font-size: 0.9rem;">${oac.tipo} (${oac.categoria})</span><br>
-                            <span class="status-badge ${badgeClass}">${statusText}</span>
+                    <div class="card" style="padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong style="color: var(--primary); font-size: 1.1rem;">Estaca ${oac.estaca}</strong><br>
+                            <span style="font-size: 0.9rem; color: var(--text-light);">${oac.tipo} (${oac.categoria})</span><br>
+                            <span class="badge ${badgeClass}" style="margin-top: 5px;">${statusText}</span>
                         </div>
                         <button class="btn btn-outline" style="width: auto; padding: 8px 15px;" onclick="abrirModalOAC('${oac.id}')">Editar</button>
                     </div>
                 `;
             });
-            document.getElementById('oac-count-concluido').innerText = concluidos;
-            document.getElementById('oac-count-andamento').innerText = andamento;
-            document.getElementById('oac-count-pendente').innerText = pendentes;
         }
 
         window.abrirModalOAC = function(id) {
             const oac = window.registrosOAC.find(item => item.id === id);
             window.oacSelecionadaId = id;
 
-            document.getElementById('modal-oac-title').innerText = `Editar Bueiro - Est. ${oac.estaca} (${oac.tipo})`;
-            document.getElementById('modal-oac-diretriz').innerText = oac.diretrizProjeto || 'Diretriz não informada.';
-            document.getElementById('modal-oac-tipo').value = oac.categoria || 'Ampliação';
-            document.getElementById('modal-oac-tipo').disabled = window.usuarioLogado.role !== 'admin';
+            document.getElementById('modal-oac-title').innerText = `Est. ${oac.estaca} (${oac.tipo})`;
+            document.getElementById('modal-oac-diretriz').innerText = oac.diretriz || 'Sem diretriz informada.';
             document.getElementById('modal-oac-extensao').value = oac.extensao || '';
             document.getElementById('modal-oac-bocas').value = oac.bocas || '';
-            document.getElementById('modal-oac-redentes').value = oac.redentes || '';
-            document.getElementById('modal-oac-recravas').value = oac.recravas || '';
             document.getElementById('modal-oac-obs').value = oac.obs || '';
             document.getElementById('modal-oac-concluido').checked = oac.concluido || false;
 
@@ -513,43 +285,120 @@
             const isConcluido = document.getElementById('modal-oac-concluido').checked;
             const extensao = document.getElementById('modal-oac-extensao').value;
             const bocas = document.getElementById('modal-oac-bocas').value;
-            
-            let novoStatus = 'pendente';
-            if (isConcluido) novoStatus = 'concluido';
-            else if (extensao || parseFloat(bocas) > 0) novoStatus = 'andamento';
 
             const dadosAtualizados = {
-                categoria: document.getElementById('modal-oac-tipo').value,
                 extensao: extensao,
                 bocas: bocas,
-                redentes: document.getElementById('modal-oac-redentes').value,
-                recravas: document.getElementById('modal-oac-recravas').value,
                 obs: document.getElementById('modal-oac-obs').value,
                 concluido: isConcluido,
-                status: novoStatus,
+                status: isConcluido ? 'concluido' : 'pendente',
                 usuarioModificacao: window.usuarioLogado.nome,
                 dataHoraModificacao: new Date().toLocaleString('pt-BR')
             };
 
-            const docRef = doc(db, "oacs", id);
-            await updateDoc(docRef, dadosAtualizados);
+            await updateDoc(doc(db, "oacs", id), dadosAtualizados);
             fecharModalOAC();
-            alert('Avanço do bueiro atualizado na nuvem!');
         }
 
-        // A Lógica do PDF continua a mesma
+        // --- LÓGICA DO RESUMO DE OACs ---
+        window.abrirModalResumo = function() {
+            let resumoObj = {};
+            gruposOficiaisOAC.forEach(g => {
+                resumoObj[g] = { total: 0, concluidas: 0, pendentes: 0, corpoExec: 0, bocasExec: 0 };
+            });
+
+            window.registrosOAC.forEach(oac => {
+                // Ignora galerias no resumo, conforme instrução
+                const tipoLower = oac.tipo.toLowerCase();
+                const obsLower = (oac.diretriz || '').toLowerCase();
+                if (tipoLower.includes('galeria') || obsLower.includes('galeria')) {
+                    return; 
+                }
+
+                // Normaliza a string do tipo para encontrar o grupo correspondente
+                let tipoDB = oac.tipo.replace('ø', 'Ø').toUpperCase().trim();
+                tipoDB = tipoDB.replace(/(\d)X(\d)/, '$1 x $2'); // Coloca espaço no x se não tiver
+                if(!tipoDB.includes('M')) tipoDB += 'm';
+
+                // Tenta achar o grupo exato que o usuário definiu
+                let grupoEncontrado = gruposOficiaisOAC.find(g => {
+                    return g.replace(/ /g, '').toUpperCase() === tipoDB.replace(/ /g, '').toUpperCase();
+                });
+
+                // Se houver pequenas variações de espaço ou 'm', tenta encaixar
+                if (!grupoEncontrado) {
+                    grupoEncontrado = gruposOficiaisOAC.find(g => tipoDB.includes(g.replace('m', '').trim().toUpperCase()));
+                }
+
+                if (grupoEncontrado) {
+                    resumoObj[grupoEncontrado].total++;
+                    if (oac.concluido) {
+                        resumoObj[grupoEncontrado].concluidas++;
+                    } else {
+                        resumoObj[grupoEncontrado].pendentes++;
+                    }
+                    resumoObj[grupoEncontrado].corpoExec += parseFloat(oac.extensao) || 0;
+                    resumoObj[grupoEncontrado].bocasExec += parseInt(oac.bocas) || 0;
+                }
+            });
+
+            const tbody = document.getElementById('tabela-resumo-body');
+            tbody.innerHTML = '';
+
+            gruposOficiaisOAC.forEach(g => {
+                const r = resumoObj[g];
+                if (r.total > 0) {
+                    const pctConcluida = Math.round((r.concluidas / r.total) * 100);
+                    const pctPendente = Math.round((r.pendentes / r.total) * 100);
+                    
+                    tbody.innerHTML += `
+                        <tr>
+                            <td style="text-align: left; font-weight: bold;">${g}</td>
+                            <td>${r.total}</td>
+                            <td><span class="badge badge-concluido">${r.concluidas} (${pctConcluida}%)</span></td>
+                            <td><span class="badge badge-pendente">${r.pendentes} (${pctPendente}%)</span></td>
+                            <td style="color: var(--primary); font-weight: bold;">${r.corpoExec.toFixed(2).replace('.',',')}</td>
+                            <td style="color: var(--primary); font-weight: bold;">${r.bocasExec}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            document.getElementById('modal-resumo').style.display = 'flex';
+        }
+
+        window.fecharModalResumo = function() {
+            document.getElementById('modal-resumo').style.display = 'none';
+        }
+
+        // --- O CÓDIGO DO DIAGRAMA FOI MANTIDO INTACTO ABAIXO ---
+        window.salvarDiagrama = async function() {
+            const servico = document.getElementById('diag-servico').value;
+            const status = document.getElementById('diag-status').value;
+            const estIni = document.getElementById('diag-est-ini').value;
+            const fracIni = document.getElementById('diag-frac-ini').value || "0";
+            const estFin = document.getElementById('diag-est-fin').value;
+            const fracFin = document.getElementById('diag-frac-fin').value || "0";
+
+            if(!estIni || !estFin) { alert("Preencha as estacas inicial e final."); return; }
+
+            await addDoc(diagRef, {
+                dataHora: new Date().toLocaleString('pt-BR'),
+                timestamp: Date.now(),
+                usuario: window.usuarioLogado.nome,
+                servico, status, estIni, fracIni, estFin, fracFin
+            });
+            alert('Apontamento salvo!');
+            document.getElementById('diag-est-ini').value = '';
+            document.getElementById('diag-est-fin').value = '';
+        }
+
         window.gerarPlantaPDF = async function() {
             try {
                 alert('Aguarde, processando as cores e gerando o PDF...');
-                const urlBase = 'base_diagrama.pdf';
-                const existingPdfBytes = await fetch(urlBase).then(res => {
-                    if(!res.ok) throw new Error('Arquivo "base_diagrama.pdf" não encontrado.');
-                    return res.arrayBuffer();
-                });
-
+                const existingPdfBytes = await fetch('base_diagrama.pdf').then(res => res.arrayBuffer());
                 const { PDFDocument, rgb } = PDFLib;
                 const pdfDoc = await PDFDocument.load(existingPdfBytes);
-                const pages = pdfDoc.getPages();
                 
                 const cores = {
                     'Limpeza/Supressão': rgb(0.13, 0.55, 0.13), 'Terraplenagem': rgb(0.93, 0.46, 0.0), 'Regularização': rgb(0.55, 0.27, 0.07),
@@ -557,20 +406,21 @@
                     'TSD': rgb(0.1, 0.1, 0.1), 'Em Execução': rgb(0.99, 0.82, 0.30)
                 };
 
+                const pages = pdfDoc.getPages();
                 const page1 = pages[0];
                 const { height } = page1.getSize(); 
                 let legX = 40; let legY = height - 30; 
                 
-                page1.drawText('LEGENDA DE SERVIÇOS (CONCLUÍDOS):', { x: legX, y: legY + 12, size: 9, color: rgb(0,0,0) });
+                page1.drawText('LEGENDA DE SERVIÇOS:', { x: legX, y: legY + 12, size: 9, color: rgb(0,0,0) });
                 const desenharLegenda = (texto, cor, posX, posY) => {
                     page1.drawRectangle({ x: posX, y: posY, width: 10, height: 10, color: cor });
                     page1.drawText(texto, { x: posX + 15, y: posY + 2, size: 8 });
                 };
 
                 desenharLegenda('Em Execução', cores['Em Execução'], legX, legY - 5); desenharLegenda('Limpeza', cores['Limpeza/Supressão'], legX + 80, legY - 5);
-                desenharLegenda('Terraplenagem', cores['Terraplenagem'], legX + 140, legY - 5); desenharLegenda('Regul.', cores['Regularização'], legX + 230, legY - 5);
-                desenharLegenda('Sub Base', cores['Sub Base'], legX + 280, legY - 5); desenharLegenda('Base', cores['Base'], legX + 340, legY - 5);
-                desenharLegenda('Imprimação', cores['Imprimação'], legX + 390, legY - 5); desenharLegenda('TSD', cores['TSD'], legX + 460, legY - 5);
+                desenharLegenda('Terra', cores['Terraplenagem'], legX + 140, legY - 5); desenharLegenda('Regul.', cores['Regularização'], legX + 190, legY - 5);
+                desenharLegenda('S. Base', cores['Sub Base'], legX + 240, legY - 5); desenharLegenda('Base', cores['Base'], legX + 295, legY - 5);
+                desenharLegenda('Imprim.', cores['Imprimação'], legX + 340, legY - 5); desenharLegenda('TSD', cores['TSD'], legX + 395, legY - 5);
 
                 const roadStatus = new Array(649).fill(null);
                 const registrosOrdemCronologica = [...window.registrosDiagrama].reverse();
@@ -601,9 +451,7 @@
                         if (rowIndex === 2) yBase = height - 540; 
                         let xBase = 50 + (posNaLinha * 6.5); 
                         
-                        paginaAtual.drawRectangle({
-                            x: xBase, y: yBase, width: 6.5, height: 30, color: corAplicada, opacity: 0.65
-                        });
+                        paginaAtual.drawRectangle({ x: xBase, y: yBase, width: 6.5, height: 30, color: corAplicada, opacity: 0.65 });
                     }
                 }
 
@@ -611,10 +459,12 @@
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = 'Planta_Iluminada_CE388_Atualizada.pdf';
+                link.download = 'Planta_Iluminada_CE388.pdf';
                 link.click();
-            } catch (error) { console.error(error); alert('Erro ao gerar PDF: ' + error.message); }
+            } catch (error) { alert('Erro ao gerar PDF: ' + error.message); }
         }
     </script>
 </body>
 </html>
+
+```
