@@ -254,7 +254,9 @@
 
             document.getElementById('modal-oac-title').innerText = `Est. ${oac.estaca} (${oac.tipo})`;
             document.getElementById('modal-oac-diretriz').innerText = oac.diretriz || 'Sem diretriz informada.';
-            document.getElementById('modal-oac-extensao').value = oac.extensao || '';
+            
+            // Ao abrir, se houver valor, mostra com vírgula para o brasileiro
+            document.getElementById('modal-oac-extensao').value = oac.extensao ? String(oac.extensao).replace('.', ',') : '';
             document.getElementById('modal-oac-bocas').value = oac.bocas || '';
             document.getElementById('modal-oac-obs').value = oac.obs || '';
             document.getElementById('modal-oac-concluido').checked = oac.concluido || false;
@@ -262,15 +264,13 @@
             document.getElementById('modal-oac').style.display = 'flex';
         }
 
-        window.fecharModalOAC = function() {
-            document.getElementById('modal-oac').style.display = 'none';
-            window.oacSelecionadaId = null;
-        }
-
         window.salvarOAC = async function() {
             const id = window.oacSelecionadaId;
             const isConcluido = document.getElementById('modal-oac-concluido').checked;
-            const extensao = document.getElementById('modal-oac-extensao').value;
+            
+            // Pega o valor digitado e troca vírgula por ponto para o banco de dados calcular
+            let extensaoRaw = document.getElementById('modal-oac-extensao').value.trim();
+            const extensao = extensaoRaw.replace(',', '.');
             const bocas = document.getElementById('modal-oac-bocas').value;
 
             const dadosAtualizados = {
@@ -287,45 +287,46 @@
             fecharModalOAC();
         }
 
-        // --- LÓGICA DO RESUMO DE OACs ---
+        // --- LÓGICA DO RESUMO DE OACs ATUALIZADA ---
         window.abrirModalResumo = function() {
             let resumoObj = {};
             gruposOficiaisOAC.forEach(g => {
-                resumoObj[g] = { total: 0, concluidas: 0, pendentes: 0, corpoExec: 0, bocasExec: 0 };
+                resumoObj[g] = { total: 0, concluidas: 0, pendentes: 0, corpoExec: 0, bocasExec: 0, corpoProj: 0, bocasProj: 0 };
             });
 
             window.registrosOAC.forEach(oac => {
-                // Ignora galerias no resumo, conforme instrução
                 const tipoLower = oac.tipo.toLowerCase();
                 const obsLower = (oac.diretriz || '').toLowerCase();
-                if (tipoLower.includes('galeria') || obsLower.includes('galeria')) {
-                    return; 
-                }
+                if (tipoLower.includes('galeria') || obsLower.includes('galeria')) return; 
 
-                // Normaliza a string do tipo para encontrar o grupo correspondente
                 let tipoDB = oac.tipo.replace('ø', 'Ø').toUpperCase().trim();
-                tipoDB = tipoDB.replace(/(\d)X(\d)/, '$1 x $2'); // Coloca espaço no x se não tiver
+                tipoDB = tipoDB.replace(/(\d)X(\d)/, '$1 x $2'); 
                 if(!tipoDB.includes('M')) tipoDB += 'm';
 
-                // Tenta achar o grupo exato que o usuário definiu
-                let grupoEncontrado = gruposOficiaisOAC.find(g => {
-                    return g.replace(/ /g, '').toUpperCase() === tipoDB.replace(/ /g, '').toUpperCase();
-                });
-
-                // Se houver pequenas variações de espaço ou 'm', tenta encaixar
+                let grupoEncontrado = gruposOficiaisOAC.find(g => g.replace(/ /g, '').toUpperCase() === tipoDB.replace(/ /g, '').toUpperCase());
                 if (!grupoEncontrado) {
                     grupoEncontrado = gruposOficiaisOAC.find(g => tipoDB.includes(g.replace('m', '').trim().toUpperCase()));
                 }
 
                 if (grupoEncontrado) {
                     resumoObj[grupoEncontrado].total++;
-                    if (oac.concluido) {
-                        resumoObj[grupoEncontrado].concluidas++;
-                    } else {
-                        resumoObj[grupoEncontrado].pendentes++;
-                    }
-                    resumoObj[grupoEncontrado].corpoExec += parseFloat(oac.extensao) || 0;
+                    if (oac.concluido) resumoObj[grupoEncontrado].concluidas++;
+                    else resumoObj[grupoEncontrado].pendentes++;
+                    
+                    // Somando executados (garantindo que se for lido com ponto, funcione)
+                    let extExecutada = typeof oac.extensao === 'string' ? oac.extensao.replace(',', '.') : oac.extensao;
+                    resumoObj[grupoEncontrado].corpoExec += parseFloat(extExecutada) || 0;
                     resumoObj[grupoEncontrado].bocasExec += parseInt(oac.bocas) || 0;
+
+                    // Inteligência: Extraindo Quantidades Fixas de Projeto do Texto da Diretriz
+                    let matchCorpo = obsLower.match(/(\d+[,.]\d+|\d+)\s*(metros|m\b)/);
+                    if (matchCorpo) {
+                        resumoObj[grupoEncontrado].corpoProj += parseFloat(matchCorpo[1].replace(',', '.'));
+                    }
+                    let matchBocas = obsLower.match(/(\d+)\s*bocas/);
+                    if (matchBocas) {
+                        resumoObj[grupoEncontrado].bocasProj += parseInt(matchBocas[1]);
+                    }
                 }
             });
 
@@ -344,8 +345,12 @@
                             <td>${r.total}</td>
                             <td><span class="badge badge-concluido">${r.concluidas} (${pctConcluida}%)</span></td>
                             <td><span class="badge badge-pendente">${r.pendentes} (${pctPendente}%)</span></td>
-                            <td style="color: var(--primary); font-weight: bold;">${r.corpoExec.toFixed(2).replace('.',',')}</td>
-                            <td style="color: var(--primary); font-weight: bold;">${r.bocasExec}</td>
+                            
+                            <td style="color: var(--text-light);">${r.corpoProj.toFixed(2).replace('.', ',')}</td>
+                            <td style="color: var(--primary); font-weight: bold; background: #ecfdf5;">${r.corpoExec.toFixed(2).replace('.', ',')}</td>
+                            
+                            <td style="color: var(--text-light);">${r.bocasProj}</td>
+                            <td style="color: var(--primary); font-weight: bold; background: #ecfdf5;">${r.bocasExec}</td>
                         </tr>
                     `;
                 }
