@@ -295,15 +295,41 @@
             const user = document.getElementById('login-user').value.trim().toLowerCase();
             const pass = document.getElementById('login-pass').value;
 
+            /*
+            ====================================================================
+            ÁREA DE CADASTRO DE USUÁRIOS E SENHAS DA EQUIPE
+            Instruções para o Carlos:
+            1. Para adicionar alguém, copie um bloco "else if" inteiro e cole abaixo.
+            2. 'user' é o login (obrigatoriamente use letras minúsculas).
+            3. 'pass' é a senha.
+            4. 'nome' é como a pessoa será identificada nos registros.
+            5. 'role' é o nível de acesso:
+               - 'admin' = Acesso total (você).
+               - 'user'  = Bloqueado no diagrama.
+            ====================================================================
+            */
+
             if (user === 'admin' && pass === 'admin') {
-                window.usuarioLogado = { nome: 'Carlos', role: 'admin' };
-            } else if (user === 'colab' && pass === '123') {
-                window.usuarioLogado = { nome: 'Colaborador 01', role: 'user' };
+                // --- Cadastro 1 (Carlos - Administrador) ---
+                window.usuarioLogado = { nome: 'Carlos Cesar', role: 'admin' };
+
+            } else if (user === 'pedro' && pass === 'senha123') {
+                // --- Cadastro 2 (Exemplo Colaborador 1) ---
+                window.usuarioLogado = { nome: 'Pedro Silva', role: 'user' };
+
+            } else if (user === 'joao' && pass === 'senha456') {
+                // --- Cadastro 3 (Exemplo Colaborador 2) ---
+                window.usuarioLogado = { nome: 'João Souza', role: 'user' };
+
+            // === SE FOR ADICIONAR MAIS ALGUÉM, COLE AQUI ACIMA ===
+
             } else {
+                // Se a senha estiver errada ou o usuário não existir
                 alert('Usuário ou senha incorretos.');
                 return;
             }
 
+            // Oculta a tela de login e mostra o sistema
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-structure').classList.remove('hidden');
             document.getElementById('user-display').innerText = window.usuarioLogado.nome;
