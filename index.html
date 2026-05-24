@@ -92,11 +92,11 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
                 <div>
                     <label style="font-size: 0.8rem; font-weight: bold;">Corpo Executado (m)</label>
-                    <input type="number" step="0.01" id="modal-oac-extensao">
+                    <input type="text" inputmode="decimal" id="modal-oac-extensao" placeholder="Ex: 8,5">
                 </div>
                 <div>
                     <label style="font-size: 0.8rem; font-weight: bold;">Bocas Executadas (und)</label>
-                    <input type="number" id="modal-oac-bocas">
+                    <input type="number" id="modal-oac-bocas" placeholder="Ex: 2">
                 </div>
             </div>
             <textarea id="modal-oac-obs" rows="3" placeholder="Observações de execução..." style="margin-bottom:10px;"></textarea>
@@ -112,19 +112,21 @@
     </div>
 
     <div class="modal" id="modal-resumo">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 95vw; width: 1000px;">
             <h3 style="margin-bottom: 15px; color: var(--primary);">Resumo de Obras D'Arte (Grupos)</h3>
             <p style="font-size: 0.8rem; color: var(--danger); margin-bottom: 15px;">*Galerias não computadas neste resumo.</p>
             <div style="overflow-x: auto; max-height: 60vh;">
                 <table class="tabela-resumo">
                     <thead>
                         <tr>
-                            <th style="text-align: left; min-width: 130px;">Grupo / Tipo</th>
-                            <th>OACs (Qtd)</th>
-                            <th>Concluídas (%)</th>
-                            <th>Pendentes (%)</th>
-                            <th>Corpo Exec. (m)</th>
-                            <th>Bocas Exec. (und)</th>
+                            <th style="text-align: left; min-width: 140px;">Grupo / Tipo</th>
+                            <th>Qtd</th>
+                            <th>Concluídas</th>
+                            <th>Pendentes</th>
+                            <th style="background: #374151;">Corpo Proj. (m)</th>
+                            <th style="background: #059669;">Corpo Exec. (m)</th>
+                            <th style="background: #374151;">Bocas Proj. (und)</th>
+                            <th style="background: #059669;">Bocas Exec. (und)</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-resumo-body">
