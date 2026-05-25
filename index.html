@@ -469,7 +469,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyC2CyPHNziQlavyCzttDY3D96TmhkYHoaQ",
@@ -483,6 +483,15 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // ATIVAÇÃO DO MODO OFFLINE
+        enableIndexedDbPersistence(db).catch((err) => {
+            if (err.code == 'failed-precondition') {
+                console.warn('Múltiplas abas abertas, persistência offline ativada apenas na primeira.');
+            } else if (err.code == 'unimplemented') {
+                console.warn('O navegador atual não suporta persistência offline.');
+            }
+        });
+        
         const diagRef = collection(db, "diagrama");
         const oacRef = collection(db, "oacs");
 
