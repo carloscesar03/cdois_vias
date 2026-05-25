@@ -330,7 +330,7 @@
             <div class="card">
                 <div class="input-group">
                     <label>Serviço Executado</label>
-                    <select id="diag-servico">
+                    <select id="diag-servico" onchange="verificarLadoServico()">
                         <option value="Limpeza/Supressão">Limpeza / Supressão Vegetal</option>
                         <option value="Terraplenagem">Terraplenagem</option>
                         <option value="Regularização">Regularização do Subleito</option>
@@ -338,8 +338,18 @@
                         <option value="Base">Base</option>
                         <option value="Imprimação">Imprimação</option>
                         <option value="TSD">Tratamento Superficial Duplo (TSD)</option>
+                        <option value="Cerca">Cerca</option> </select>
+                </div>
+                
+                <div class="input-group" id="div-diag-lado" style="display: block;">
+                    <label>Lado da Execução</label>
+                    <select id="diag-lado">
+                        <option value="Eixo">Eixo</option>
+                        <option value="Lado Direito">Lado Direito</option>
+                        <option value="Lado Esquerdo">Lado Esquerdo</option>
                     </select>
                 </div>
+
                 <div class="input-group">
                     <label>Status</label>
                     <select id="diag-status">
@@ -372,8 +382,14 @@
             </div>
             
             <div class="card">
-                <h3 style="margin-bottom: 5px; color: var(--primary);">Gráficos de Execução do Trecho</h3>
-                <p style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 15px;">Extensão Total: Estaca 0+0,00 a 648+6,30 (12.966,30 m)</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <h3 style="margin-bottom: 5px; color: var(--primary);">Gráficos de Execução</h3>
+                        <p style="font-size: 0.75rem; color: var(--text-light);">Extensão: Est. 0 a 648+6,30 (12.966,30 m)</p>
+                    </div>
+                    <button class="btn btn-outline" style="width: auto; padding: 8px 15px; font-size: 0.8rem;" onclick="abrirModalPlanilha()">Gerar Planilha</button>
+                </div>
+                
                 <div id="graficos-avanco">
                     <p style="font-size: 0.8rem; color: var(--text-light);">Calculando dados...</p>
                 </div>
@@ -472,7 +488,34 @@
             <button class="btn" style="margin-top: 20px; background: var(--text-light);" onclick="fecharModalResumo()">Fechar Resumo</button>
         </div>
     </div>
-
+    
+    <div class="modal" id="modal-planilha">
+        <div class="modal-content" style="max-width: 95vw; width: 1000px;">
+            <h3 style="margin-bottom: 15px; color: var(--primary);">Planilha de Execução (Diagrama)</h3>
+            <div style="overflow-x: auto; max-height: 60vh;">
+                <table class="tabela-resumo">
+                    <thead>
+                        <tr>
+                            <th style="text-align: center; background: var(--primary); color: white;">Item</th>
+                            <th style="text-align: center; background: var(--primary); color: white;">Data</th>
+                            <th style="text-align: center; background: var(--primary); color: white;">Serviço</th>
+                            <th style="text-align: center; background: var(--primary); color: white;">Estaca Inicial</th>
+                            <th style="text-align: center; background: var(--primary); color: white;">Estaca Final</th>
+                            <th style="text-align: center; background: var(--primary); color: white;">Extensão (m)</th>
+                            <th style="text-align: center; background: var(--primary); color: white;">Lado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-planilha-body">
+                        </tbody>
+                </table>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn" style="background: var(--text-light);" onclick="fecharModalPlanilha()">Fechar</button>
+                <button class="btn btn-success" onclick="baixarCSVPlanilha()">Baixar (Excel)</button>
+            </div>
+        </div>
+    </div>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -694,6 +737,19 @@
             }
         }
 
+        // --- Inteligência do Lado (Eixo, Esq, Dir) ---
+        window.verificarLadoServico = function() {
+            const servico = document.getElementById('diag-servico').value;
+            const divLado = document.getElementById('div-diag-lado');
+            
+            // Ativa o lado APENAS caso seja Limpeza ou Cerca
+            if (servico === 'Limpeza/Supressão' || servico === 'Cerca') {
+                divLado.style.display = 'block';
+            } else {
+                divLado.style.display = 'none';
+            }
+        }
+
         window.salvarDiagrama = async function() {
             const servico = document.getElementById('diag-servico').value;
             const status = document.getElementById('diag-status').value;
@@ -702,13 +758,19 @@
             const estFin = document.getElementById('diag-est-fin').value;
             const fracFin = document.getElementById('diag-frac-fin').value || "0";
 
+            // Capturando a informação do Lado
+            let lado = "-";
+            if (servico === 'Limpeza/Supressão' || servico === 'Cerca') {
+                lado = document.getElementById('diag-lado').value;
+            }
+
             if(!estIni || !estFin) { alert("Preencha as estacas inicial e final."); return; }
 
             const novoRegistro = {
                 dataHora: new Date().toLocaleString('pt-BR'),
                 timestamp: Date.now(),
                 usuario: window.usuarioLogado.nome,
-                servico, status, estIni, fracIni, estFin, fracFin
+                servico, status, estIni, fracIni, estFin, fracFin, lado // Salvando o Lado no Firebase
             };
 
             await addDoc(diagRef, novoRegistro);
@@ -720,6 +782,63 @@
             document.getElementById('diag-frac-fin').value = '';
         }
 
+        // --- Lógica de Geração da Planilha de Execução ---
+        window.abrirModalPlanilha = function() {
+            const tbody = document.getElementById('tabela-planilha-body');
+            tbody.innerHTML = '';
+
+            let item = 1;
+            
+            window.registrosDiagrama.forEach(reg => {
+                // Matemática de Extensão (Transforma estaca em metros e calcula a diferença)
+                let ini = (parseFloat(reg.estIni) * 20) + parseFloat(reg.fracIni ? String(reg.fracIni).replace(',', '.') : 0);
+                let fin = (parseFloat(reg.estFin) * 20) + parseFloat(reg.fracFin ? String(reg.fracFin).replace(',', '.') : 0);
+                let extensao = Math.abs(fin - ini).toFixed(2).replace('.', ',');
+                
+                let ladoText = reg.lado ? reg.lado : "-";
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="text-align: center;">${item++}</td>
+                        <td style="text-align: center;">${reg.dataHora.split(' ')[0]}</td>
+                        <td style="text-align: center; color: var(--primary); font-weight: bold;">${reg.servico}</td>
+                        <td style="text-align: center;">${reg.estIni} + ${reg.fracIni}</td>
+                        <td style="text-align: center;">${reg.estFin} + ${reg.fracFin}</td>
+                        <td style="text-align: center; font-weight: bold;">${extensao}</td>
+                        <td style="text-align: center;">${ladoText}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('modal-planilha').style.display = 'flex';
+        }
+
+        window.fecharModalPlanilha = function() {
+            document.getElementById('modal-planilha').style.display = 'none';
+        }
+
+        // --- Lógica para Baixar a Planilha ---
+        window.baixarCSVPlanilha = function() {
+            let csv = "Item;Data;Servico;Estaca Inicial;Estaca Final;Extensao (m);Lado\n";
+            let item = 1;
+            window.registrosDiagrama.forEach(reg => {
+                let ini = (parseFloat(reg.estIni) * 20) + parseFloat(reg.fracIni ? String(reg.fracIni).replace(',', '.') : 0);
+                let fin = (parseFloat(reg.estFin) * 20) + parseFloat(reg.fracFin ? String(reg.fracFin).replace(',', '.') : 0);
+                let extensao = Math.abs(fin - ini).toFixed(2).replace('.', ',');
+                let ladoText = reg.lado ? reg.lado : "-";
+                
+                csv += `${item++};${reg.dataHora.split(' ')[0]};${reg.servico};${reg.estIni} + ${reg.fracIni};${reg.estFin} + ${reg.fracFin};${extensao};${ladoText}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "planilha_execucao_diagrama.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
         function atualizarLogsRecentes() {
             const container = document.getElementById('recent-logs');
             container.innerHTML = '';
