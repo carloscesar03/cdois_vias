@@ -324,14 +324,14 @@
         </div>
 
         <div id="view-diagrama" class="screen view-section hidden">
-            <h2>Diagrama Iluminado</h2>
-            <p style="margin-bottom: 20px; color: var(--text-light);">Lançamento de Avanço Físico</p>
+            <h2>Avanço Físico da Rodovia</h2>
+            <p style="margin-bottom: 20px; color: var(--text-light);">Lançamento e Gráficos de Execução</p>
 
             <div class="card">
                 <div class="input-group">
                     <label>Serviço Executado</label>
                     <select id="diag-servico">
-                        <option value="Limpeza/Supressão">Limpeza/Supressão Vegetal</option>
+                        <option value="Limpeza/Supressão">Limpeza / Supressão Vegetal</option>
                         <option value="Terraplenagem">Terraplenagem</option>
                         <option value="Regularização">Regularização do Subleito</option>
                         <option value="Sub Base">Sub Base</option>
@@ -356,7 +356,7 @@
                     </div>
                     <div class="input-group">
                         <label>Fração (+)</label>
-                        <input type="number" step="0.01" id="diag-frac-ini" placeholder="Ex: 5.50">
+                        <input type="text" inputmode="decimal" id="diag-frac-ini" placeholder="Ex: 5,50">
                     </div>
                     <div class="input-group">
                         <label>Estaca Final</label>
@@ -364,7 +364,7 @@
                     </div>
                     <div class="input-group">
                         <label>Fração (+)</label>
-                        <input type="number" step="0.01" id="diag-frac-fin" placeholder="Ex: 0.00">
+                        <input type="text" inputmode="decimal" id="diag-frac-fin" placeholder="Ex: 0,00">
                     </div>
                 </div>
 
@@ -372,10 +372,14 @@
             </div>
             
             <div class="card">
-                <button class="btn btn-outline" onclick="gerarPlantaPDF()">Gerar Planta Iluminada (PDF)</button>
+                <h3 style="margin-bottom: 5px; color: var(--primary);">Gráficos de Execução do Trecho</h3>
+                <p style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 15px;">Extensão Total: Estaca 0+0,00 a 648+6,30 (12.966,30 m)</p>
+                <div id="graficos-avanco">
+                    <p style="font-size: 0.8rem; color: var(--text-light);">Calculando dados...</p>
+                </div>
             </div>
         </div>
-
+        
         <div id="view-oac" class="screen view-section hidden">
             <h2>Obras D'Arte Correntes</h2>
             <p style="margin-bottom: 15px; color: var(--text-light);">Controle de Bueiros</p>
@@ -582,6 +586,11 @@
                 snapshot.forEach((doc) => window.registrosDiagrama.push({ id: doc.id, ...doc.data() }));
                 window.registrosDiagrama.sort((a, b) => b.timestamp - a.timestamp);
                 atualizarLogsRecentes();
+                
+                // Dispara a atualização dos gráficos de barras
+                if(typeof window.atualizarGraficosDiagrama === 'function') {
+                    window.atualizarGraficosDiagrama();
+                }
             });
 
             onSnapshot(oacRef, (snapshot) => {
@@ -884,83 +893,74 @@
             document.getElementById('modal-resumo').style.display = 'none';
         }
 
-        // --- Lógica do PDF Diagrama ---
-        window.gerarPlantaPDF = async function() {
-            try {
-                alert('Aguarde, processando as cores e gerando o PDF...');
-                const urlBase = 'base_diagrama.pdf';
-                const existingPdfBytes = await fetch(urlBase).then(res => {
-                    if(!res.ok) throw new Error('Arquivo "base_diagrama.pdf" não encontrado.');
-                    return res.arrayBuffer();
+        // --- Inteligência dos Gráficos de Avanço do Diagrama ---
+        window.atualizarGraficosDiagrama = function() {
+            // Estaca 648 + 6,30m = 12966.30 metros de rodovia
+            const EXTENSAO_TOTAL_METROS = 12966.30; 
+            
+            // Relacionando os nomes do banco com os rótulos e as cores
+            const servicos = [
+                { idBase: "Limpeza/Supressão", label: "Limpeza / Supressão Vegetal", cor: "#22c55e" }, // Verde
+                { idBase: "Terraplenagem", label: "Terraplenagem", cor: "#f97316" }, // Laranja
+                { idBase: "Regularização", label: "Regularização do Subleito", cor: "#8b5cf6" }, // Roxo
+                { idBase: "Sub Base", label: "Sub Base", cor: "#3b82f6" }, // Azul
+                { idBase: "Base", label: "Base", cor: "#d946ef" }, // Rosa
+                { idBase: "Imprimação", label: "Imprimação", cor: "#64748b" }, // Cinza 
+                { idBase: "TSD", label: "TSD", cor: "#1a1a1a" } // Preto fosco
+            ];
+
+            let htmlGraficos = '';
+
+            servicos.forEach(serv => {
+                // Filtra os apontamentos desse serviço específico (ignorando os "Pendentes")
+                let apontamentos = window.registrosDiagrama.filter(r => r.servico === serv.idBase && r.status !== 'Pendente');
+                
+                // Converte estacas em metros exatos. Cria intervalos de [início, fim]
+                let intervalos = apontamentos.map(r => {
+                    let ini = (parseFloat(r.estIni) * 20) + parseFloat(r.fracIni ? String(r.fracIni).replace(',', '.') : 0);
+                    let fin = (parseFloat(r.estFin) * 20) + parseFloat(r.fracFin ? String(r.fracFin).replace(',', '.') : 0);
+                    return [Math.min(ini, fin), Math.max(ini, fin)];
                 });
 
-                const { PDFDocument, rgb } = PDFLib;
-                const pdfDoc = await PDFDocument.load(existingPdfBytes);
-                const pages = pdfDoc.getPages();
-                
-                const cores = {
-                    'Limpeza/Supressão': rgb(0.13, 0.55, 0.13), 'Terraplenagem': rgb(0.93, 0.46, 0.0), 'Regularização': rgb(0.55, 0.27, 0.07),
-                    'Sub Base': rgb(0.2, 0.6, 1.0), 'Base': rgb(0.5, 0.0, 0.5), 'Imprimação': rgb(0.4, 0.4, 0.4),
-                    'TSD': rgb(0.1, 0.1, 0.1), 'Em Execução': rgb(0.99, 0.82, 0.30)
-                };
-
-                const page1 = pages[0];
-                const { height } = page1.getSize(); 
-                let legX = 40; let legY = height - 30; 
-                
-                page1.drawText('LEGENDA DE SERVIÇOS (CONCLUÍDOS):', { x: legX, y: legY + 12, size: 9, color: rgb(0,0,0) });
-                const desenharLegenda = (texto, cor, posX, posY) => {
-                    page1.drawRectangle({ x: posX, y: posY, width: 10, height: 10, color: cor });
-                    page1.drawText(texto, { x: posX + 15, y: posY + 2, size: 8 });
-                };
-
-                desenharLegenda('Em Execução', cores['Em Execução'], legX, legY - 5); desenharLegenda('Limpeza', cores['Limpeza/Supressão'], legX + 80, legY - 5);
-                desenharLegenda('Terraplenagem', cores['Terraplenagem'], legX + 140, legY - 5); desenharLegenda('Regul.', cores['Regularização'], legX + 230, legY - 5);
-                desenharLegenda('Sub Base', cores['Sub Base'], legX + 280, legY - 5); desenharLegenda('Base', cores['Base'], legX + 340, legY - 5);
-                desenharLegenda('Imprimação', cores['Imprimação'], legX + 390, legY - 5); desenharLegenda('TSD', cores['TSD'], legX + 460, legY - 5);
-
-                const roadStatus = new Array(649).fill(null);
-                const registrosOrdemCronologica = [...window.registrosDiagrama].reverse();
-                
-                registrosOrdemCronologica.forEach(reg => {
-                    let inicio = parseInt(reg.estIni); let fim = parseInt(reg.estFin);
-                    for(let i = inicio; i <= fim; i++) { if(i <= 648) { roadStatus[i] = { status: reg.status, servico: reg.servico }; } }
-                });
-
-                for (let i = 0; i <= 648; i++) {
-                    if (roadStatus[i] && roadStatus[i].status !== 'Pendente') {
-                        let corAplicada = roadStatus[i].status === 'Concluído' ? cores[roadStatus[i].servico] : cores['Em Execução'];
-                        let pageIndex = 0; let rowIndex = 0; let posNaLinha = 0;
-
-                        if (i <= 120) { pageIndex = 0; rowIndex = 0; posNaLinha = i; }
-                        else if (i <= 241) { pageIndex = 0; rowIndex = 1; posNaLinha = i - 121; }
-                        else if (i <= 362) { pageIndex = 0; rowIndex = 2; posNaLinha = i - 242; }
-                        else if (i <= 483) { pageIndex = 1; rowIndex = 0; posNaLinha = i - 363; }
-                        else if (i <= 604) { pageIndex = 1; rowIndex = 1; posNaLinha = i - 484; }
-                        else { pageIndex = 1; rowIndex = 2; posNaLinha = i - 605; }
-
-                        let paginaAtual = pages[pageIndex];
-                        if (!paginaAtual) continue; 
-
-                        let yBase;
-                        if (rowIndex === 0) yBase = height - 200; 
-                        if (rowIndex === 1) yBase = height - 370; 
-                        if (rowIndex === 2) yBase = height - 540; 
-                        let xBase = 50 + (posNaLinha * 6.5); 
-                        
-                        paginaAtual.drawRectangle({
-                            x: xBase, y: yBase, width: 6.5, height: 30, color: corAplicada, opacity: 0.65
-                        });
+                // Algoritmo de mesclagem: Evita que apontamentos de estacas repetidas passem de 100%
+                intervalos.sort((a, b) => a[0] - b[0]);
+                let intervalosMesclados = [];
+                if (intervalos.length > 0) {
+                    let atual = intervalos[0];
+                    for (let i = 1; i < intervalos.length; i++) {
+                        if (intervalos[i][0] <= atual[1]) {
+                            atual[1] = Math.max(atual[1], intervalos[i][1]); // Mescla trechos que se sobrepõem
+                        } else {
+                            intervalosMesclados.push(atual);
+                            atual = intervalos[i];
+                        }
                     }
+                    intervalosMesclados.push(atual);
                 }
 
-                const pdfBytes = await pdfDoc.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'Planta_Iluminada_CE388_Atualizada.pdf';
-                link.click();
-            } catch (error) { console.error(error); alert('Erro ao gerar PDF: ' + error.message); }
+                // Soma quantos metros lineares foram executados ao todo
+                let totalExecutado = intervalosMesclados.reduce((soma, val) => soma + (val[1] - val[0]), 0);
+                
+                // Calcula o percentual contra o total do contrato
+                let percentual = (totalExecutado / EXTENSAO_TOTAL_METROS) * 100;
+                if (percentual > 100) percentual = 100;
+
+                // Desenha as barras. Se percentual > 0, coloca o número dentro da barra
+                htmlGraficos += `
+                    <div style="margin-bottom: 18px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;">
+                            <span style="color: var(--text);">${serv.label}</span>
+                        </div>
+                        <div style="background: #e5e7eb; border-radius: 4px; height: 22px; width: 100%; overflow: hidden; position: relative; border: 1px solid var(--border);">
+                            <div style="background: ${serv.cor}; height: 100%; width: ${percentual}%; transition: width 0.5s ease-in-out;"></div>
+                            ${percentual > 0 ? `<span style="position: absolute; left: 8px; top: 0; font-size: 0.75rem; color: ${percentual > 10 ? 'white' : 'var(--text)'}; line-height: 22px; font-weight: bold;">${percentual.toFixed(2).replace('.', ',')}%</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            const container = document.getElementById('graficos-avanco');
+            if(container) container.innerHTML = htmlGraficos;
         }
     </script>
     <script>
